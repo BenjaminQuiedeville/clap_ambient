@@ -1,0 +1,6 @@
+[submodule "clap-odin"]
+	path = clap-odin
+	url = https://github.com/Galena-DSP/clap-odin.git
+[submodule "odin-imgui"]
+	path = odin-imgui
+	url = https://gitlab.com/L-4/odin-imgui.git

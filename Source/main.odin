@@ -2,6 +2,7 @@ package clap_ambient
 
 import "core:math"
 import "core:sys/windows"
+import "base:runtime"
 import "vendor/directx/d3d11"
 import "vendor/directx/dxgi"
 
@@ -10,19 +11,66 @@ import "../odin-imgui/imgui_impl_win32"
 import "../odin-imgui/imgui_impl_dx11"
 import "../clap-odin"
 
+// une interface avec des nodes qui représentent les effets -> github.com/Nelarius/imnodes
+// on peut drag les effets dans 3 ou 4 colonnes pour donner l'ordre (on peut mettre en parallele)
+// chaque node peut etre configuré sur n'importe quel effet et l'interface s'affiche dans le node
+// effets : delay, granulaire, reverb, looper habit chelou ?
+// pourquoi pas dans le fond afficher le spectre de sortie ou une animation rigolote (apprendre opengl imagine)
 
+ParamIDs :: enum {
+    Decay,
+    Tone, 
+    Mix
+    NParams,
+}
 
-PluginData :: struct {}
+EventFIFO :: struct {}
 
-get_audio_ports_count :: proc "c" (plugin: ^clap.Plugin, is_input: bool) -> u32 {}
-get_audio_ports_info :: proc "c" (plugin: ^clap.Plugin, index: u32, is_input: bool, info: ^clap.Audio_Port_Info) -> bool {}
+GUI :: struct {}
+
+Reverb :: struct {}
+
+PluginData :: struct {
+
+    plugin: clap.plugin
+    host: ^clap.host
+    host_params: ^clap.host_params
+    
+    max_buffer_size: u32
+    min_buffer_size: u32
+    samplerate: f32
+    
+    main_param_values: [.NParams]f32
+    audio_param_values: [.NParams]f32
+    
+    main_to_audio_fifo: EventFIFO
+
+    reverb: Reverb
+    gui: GUI
+}
+
+get_audio_ports_count :: proc "c" (plugin: ^clap.Plugin, is_input: bool) -> u32 { return 1 }
+
+get_audio_ports_info :: proc "c" (plugin: ^clap.Plugin, index: u32, is_input: bool, info: ^clap.Audio_Port_Info) -> bool {
+    // si y'a un probleme de canal audio faut revenir ici
+    info.id = 0
+    info.channel_count = 2
+    info.flags = clap.AUDIO_PORT_IS_MAIN
+    info.port_type = clap.PORT_STEREO
+    info.in_place_pair = clap.INVALID_ID
+    port_name :: "Main audio port"
+    for charac, index in transmute([]u8)port_name {
+        info.name[index] = charac
+    }
+}
 
 audio_port_extension :: clap.Plugin_Audio_Ports {
     count = get_audio_ports_count,
     get = get_audio_ports_info,
 };
 
-get_num_params :: proc "c" (plugin: ^clap.Plugin) -> u32 {}
+get_num_params :: proc "c" (plugin: ^clap.Plugin) -> u32 { return cast(u32)ParamIDs.NParams }
+
 params_get_info :: proc "c" (plugin: ^clap.Plugin, param_index: u32, param_info: ^clap.Param_Info) -> bool {}
 param_get_value :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, out_value: ^f64) -> bool {}
 param_convert_value_to_text :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, value: f64, out_buffer: [^]u8, out_buffer_capacity: u32) -> bool {}
@@ -39,7 +87,15 @@ extensionParams :: clap.Plugin_Params {
 };
 
 
-plugin_state_save :: proc "c" (plugin: ^clap.Plugin, stream: ^clap.OStream) -> bool {}
+plugin_state_save :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.OStream) -> bool {
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    
+    // sync les parametres avant de les sauvegarder 
+    
+    num_params_written := stream.write(stream, plugin.main_param_values, sizeof(f32)*ParamIDs.NParams))
+    return num_params_written == sizeof(f32) * ParamIDs.NParams
+}
+
 plugin_state_load :: proc "c" (plugin: ^clap.Plugin, stream: ^clap.IStream) -> bool {}
 
 state_extension :: clap.Plugin_State {
@@ -82,9 +138,18 @@ gui_extension :: clap.Plugin_Gui {
     hide = hide_gui,
 }
 
-plugin_init :: proc "c" (_plugin: ^clap.Plugin) -> bool {}
+plugin_init :: proc "c" (_plugin: ^clap.Plugin) -> bool {    
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    
+    // init 
 
-plugin_destroy :: proc "c" (_plugin: ^clap.Plugin) {}
+    plugin.host_params = plugin.host.get_extension(plugin.host, clap.EXT_PARAMS)
+    return true
+}
+
+plugin_destroy :: proc "c" (_plugin: ^clap.Plugin) {
+    plugin := transmute(^PluginData)_plugin.plugin_data
+}
 
 plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_size: u32, max_buffer_size: u32) -> bool {}
 
@@ -149,7 +214,17 @@ get_plugin_descriptor :: proc "c" (factory: ^clap.Plugin_Factory, index: u32) ->
 
 create_plugin :: proc "c" (factory: ^clap.Plugin_Factory, host: ^clap.Host, plugin_id: cstring) -> ^clap.Plugin {
     
-    return nil
+    if plugin_id != descriptor.id {
+        return nil
+    }
+    
+    context = runtime.default_context()
+    plugin := new(PluginData)
+    plugin.host = host
+    plugin.plugin = clap_plugin
+    plugin.plugin.plugin_data = plugin
+    
+    return &plugin.plugin
 }
 
 plugin_factory :: clap.Plugin_Factory {
