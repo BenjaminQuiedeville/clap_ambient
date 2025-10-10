@@ -4,6 +4,9 @@ import "core:math"
 import "core:sys/windows"
 import "core:mem"
 import "core:c/libc"
+import "core:fmt"
+import "core:strings"
+import "core:strconv"
 import "base:runtime"
 import "vendor:directx/d3d11"
 import "vendor:directx/dxgi"
@@ -20,7 +23,6 @@ import clap_ext "../clap-odin/ext"
 // effets : delay, granulaire, reverb, looper habit chelou ?
 // pourquoi pas dans le fond afficher le spectre de sortie ou une animation rigolote (apprendre opengl imagine)
 
-
 ParamIDs :: enum u32 {
     Decay,
     Tone, 
@@ -35,7 +37,9 @@ GUI :: struct {}
 Reverb :: struct {}
 
 PluginData :: struct {
-
+    
+    context: ^runtime.Context
+    
     plugin: clap.Plugin,
     host: ^clap.Host,
     host_params: ^clap_ext.Host_Params,
@@ -101,19 +105,24 @@ param_get_value :: proc "c" (_plugin: ^clap.Plugin, param_id: clap.Clap_Id, out_
 }
 
 param_convert_value_to_text :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, value: f64, out_buffer: [^]u8, out_buffer_capacity: u32) -> bool {
+    
+    context = runtime.default_context()
+
     param_index := cast(ParamIDs)param_id
+    
+    out_string := strings.string_from_ptr(out_buffer, int(out_buffer_capacity))
     
     switch param_index {
         case .Decay: {
-            libc.snprintf(out_buffer, cast(uint)out_buffer_capacity, "%d sec", value)
+            fmt.bprintf(transmute([]u8)out_string, "%d sec", value)
             return true
         }
         case .Tone: {
-            libc.snprintf(out_buffer, cast(uint)out_buffer_capacity, "%d Hz", value)
+            fmt.bprintf(transmute([]u8)out_string, "%d Hz", value)
             return true
         }
         case .Mix: {
-            libc.snprintf(out_buffer, cast(uint)out_buffer_capacity, "%d", value)
+            fmt.bprintf(transmute([]u8)out_string, "%d", value)
             return true
         }
         case .NParams: {
@@ -123,7 +132,13 @@ param_convert_value_to_text :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Cl
     return false
 }
 
-param_convert_text_to_value :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, param_value_text: cstring, out_value: ^f64) -> bool { return false }
+param_convert_text_to_value :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, param_value_text: cstring, out_value: ^f64) -> bool {
+    context = runtime.default_context()
+
+    in_string := string(param_value_text)
+    out_value^ = strconv.atof(in_string)
+    return false 
+}
 
 param_flush :: proc "c" (_plugin: ^clap.Plugin, in_events: ^clap.Input_Events, out_events: ^clap.Output_Events) {
     plugin := transmute(^PluginData)_plugin.plugin_data
