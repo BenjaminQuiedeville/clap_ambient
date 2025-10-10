@@ -38,7 +38,7 @@ Reverb :: struct {}
 
 PluginData :: struct {
     
-    context: ^runtime.Context
+    // context: ^runtime.Context
     
     plugin: clap.Plugin,
     host: ^clap.Host,
@@ -387,8 +387,18 @@ plugin_factory := clap.Plugin_Factory {
     create_plugin = create_plugin,
 }
 
-@export lib_init :: proc "c" (path: cstring) -> bool { return true }
-@export lib_deinit :: proc "c" () {}
-@export lib_get_factory :: proc "c" (id: cstring) -> rawptr {
+lib_init :: proc "c" (path: cstring) -> bool { return true }
+
+lib_deinit :: proc "c" () {}
+
+lib_get_factory :: proc "c" (id: cstring) -> rawptr {
     return id == clap.PLUGIN_FACTORY_ID ? &plugin_factory : nil
+}
+
+@(export, require)
+clap_entry := clap.Plugin_Entry {
+    clap_version = clap.CLAP_VERSION,
+    init = lib_init,
+    deinit = lib_deinit,
+    get_factory = lib_get_factory,
 }
