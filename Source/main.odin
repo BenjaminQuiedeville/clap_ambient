@@ -3,7 +3,8 @@ package clap_ambient
 import "core:math"
 import "core:sys/windows"
 import "core:mem"
-import "core:c/libc"
+import "core:slice"
+// import "core:c/libc"
 import "core:fmt"
 import "core:strings"
 import "core:strconv"
@@ -72,6 +73,7 @@ get_audio_ports_info :: proc "c" (plugin: ^clap.Plugin, index: u32, is_input: bo
     }
     return true
 }
+
 
 audio_port_extension := clap_ext.Plugin_Audio_Ports {
     count = get_audio_ports_count,
@@ -151,6 +153,7 @@ param_flush :: proc "c" (_plugin: ^clap.Plugin, in_events: ^clap.Input_Events, o
     }
 }
 
+
 params_extension := clap_ext.Plugin_Params {
     count = get_num_params,
     get_info = params_get_info,
@@ -178,6 +181,7 @@ plugin_state_load :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.IStream) -> 
     return success
 }
 
+
 state_extension := clap_ext.Plugin_State {
     save = plugin_state_save,
     load = plugin_state_load,
@@ -199,6 +203,7 @@ set_gui_transient :: proc "c" (_plugin: ^clap.Plugin, window: ^clap_ext.Window) 
 suggest_gui_title :: proc "c" (_plugin: ^clap.Plugin, title: cstring) {}
 show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
 hide_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
+
 
 gui_extension := clap_ext.Plugin_Gui {
     is_api_supported = is_gui_api_supported,
@@ -317,12 +322,11 @@ plugin_get_extension :: proc "c" (_plugin: ^clap.Plugin, id: cstring) -> rawptr 
         case clap_ext.EXT_STATE:       { return &state_extension }
         case clap_ext.EXT_GUI:         { return &gui_extension }
     }
-    
+
     return nil 
 }
 
 plugin_on_main_thread :: proc "c" (_plugin: ^clap.Plugin) {}
-
 
 clap_plugin := clap.Plugin {
     desc             = &plugin_descriptor,
@@ -339,26 +343,7 @@ clap_plugin := clap.Plugin {
     on_main_thread   = plugin_on_main_thread,
 }
 
-plugin_descriptor := clap.Plugin_Descriptor {
-    clap_version = clap.CLAP_VERSION,
-    id           = "hermes140.clap_ambient",
-    name         = "Clap Ambient",
-    vendor       = "Hermes140",
-    url          = "",
-    manual_url   = "",
-    support_url  = "",
-    version      = "0.1",
-    description  = "",
-
-    features = raw_data([]cstring {
-        "audio-effect",
-        "stereo",
-        "reverb",
-        "delay",
-        nil,
-    }),
-}
-
+plugin_descriptor : clap.Plugin_Descriptor
 
 get_plugin_count :: proc "c" (factory: ^clap.Plugin_Factory) -> u32 { return 1 }
 
@@ -387,15 +372,59 @@ plugin_factory := clap.Plugin_Factory {
     create_plugin = create_plugin,
 }
 
-lib_init :: proc "c" (path: cstring) -> bool { return true }
+plugin_features: []cstring 
 
-lib_deinit :: proc "c" () {}
+lib_init :: proc "c" (path: cstring) -> bool {
+    context = runtime.default_context()
+
+    plugin_descriptor.clap_version = clap.CLAP_VERSION
+    plugin_descriptor.id           = "hermes140.clap_ambient"
+    plugin_descriptor.name         = "Clap Ambient"
+    plugin_descriptor.vendor       = "Hermes140"
+    plugin_descriptor.url          = ""
+    plugin_descriptor.manual_url   = ""
+    plugin_descriptor.support_url  = ""
+    plugin_descriptor.version      = "0.1"
+    plugin_descriptor.description  = ""
+
+    if slice.is_empty(plugin_features) {
+        plugin_features = make([]cstring, 6)
+    }
+    plugin_features[0] = clap.PLUGIN_FEATURE_AUDIO_EFFECT
+    plugin_features[1] = clap.PLUGIN_FEATURE_STEREO
+    plugin_features[2] = clap.PLUGIN_FEATURE_MULTI_EFFECTS
+    plugin_features[3] = clap.PLUGIN_FEATURE_REVERB
+    plugin_features[4] = clap.PLUGIN_FEATURE_DELAY
+    plugin_features[5] = nil
+
+    plugin_descriptor.features = raw_data(plugin_features)
+
+
+    clap_plugin.desc             = &plugin_descriptor
+    clap_plugin.init             = plugin_init
+    clap_plugin.destroy          = plugin_destroy
+    clap_plugin.activate         = plugin_activate
+    clap_plugin.deactivate       = plugin_deactivate
+    clap_plugin.start_processing = plugin_start_processing
+    clap_plugin.stop_processing  = plugin_stop_processing
+    clap_plugin.reset            = plugin_reset
+    clap_plugin.process          = plugin_process
+    clap_plugin.get_extension    = plugin_get_extension
+    clap_plugin.on_main_thread   = plugin_on_main_thread
+
+    return true
+}
+
+lib_deinit :: proc "c" () {
+    context = runtime.default_context()
+    delete(plugin_features)
+}
 
 lib_get_factory :: proc "c" (id: cstring) -> rawptr {
     return id == clap.PLUGIN_FACTORY_ID ? &plugin_factory : nil
 }
 
-@(export, require)
+@(export)
 clap_entry := clap.Plugin_Entry {
     clap_version = clap.CLAP_VERSION,
     init = lib_init,
