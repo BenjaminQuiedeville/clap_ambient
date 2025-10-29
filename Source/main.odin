@@ -1,14 +1,14 @@
 package clap_ambient
 
+import "base:runtime"
 import "core:math"
 import "core:sys/windows"
 import "core:mem"
+import vmem "core:mem/virtual"
 import "core:slice"
-// import "core:c/libc"
 import "core:fmt"
 import "core:strings"
 import "core:strconv"
-import "base:runtime"
 import "vendor:directx/d3d11"
 import "vendor:directx/dxgi"
 
@@ -21,26 +21,130 @@ import clap_ext "../clap-odin/ext"
 // une interface avec des nodes qui représentent les effets -> github.com/Nelarius/imnodes
 // on peut drag les effets dans 3 ou 4 colonnes pour donner l'ordre (on peut mettre en parallele)
 // chaque node peut etre configuré sur n'importe quel effet et l'interface s'affiche dans le node
-// effets : delay, granulaire, reverb, looper habit chelou ?
+// effets : delay, delay multitap, granulaire temps réel, reverb(s), looper habit chelou ?
 // pourquoi pas dans le fond afficher le spectre de sortie ou une animation rigolote (apprendre opengl imagine)
 
+
 ParamIDs :: enum u32 {
-    Decay,
-    Tone, 
+    Time,
+    Feedback, 
     Mix,
     NParams,
 }
 
-EventFIFO :: struct {}
+ParamInfo :: struct {
+    name: string,
+    min: f32,
+    max: f32,
+    default_value: f32,
+    imgui_flags: u32,
+    clap_param_flags: clap_ext.Param_Info_Flag,
+}
+
+parameter_infos := [ParamIDs.NParams]ParamInfo {
+    {
+        name = "Delay Time", min = 1.0, max = 2000.0, default_value = 300.0,
+        imgui_flags = 0,
+        clap_param_flags = clap_ext.Param_Info_Flag.AUTOMATABLE
+    },
+    {
+        name = "FeedBack", min = 0.0, max = 1.0, default_value = 0.5,
+        imgui_flags = 0,
+        clap_param_flags = clap_ext.Param_Info_Flag.AUTOMATABLE
+    },
+    {
+        name = "Mix", min = 0.0, max = 1.0, default_value = 0.0,
+        imgui_flags = 0,
+        clap_param_flags = clap_ext.Param_Info_Flag.AUTOMATABLE
+    },
+}
+
+RampedValue :: struct {
+    target: f32,
+    current_value: f32,
+    step_height: f32,
+    value_buffer: []f32,
+}
+
+ramped_value_init :: proc(value: ^RampedValue, init_value: f32, buffer_size: u32, arena: ^vmem.Arena) {
+
+    value.target = init_value
+    value.step_height = 0.0
+    value.current_value = int_value
+    value.value_buffer = make([]f32, buffer_size, vmem.arena_allocator(arena))
+}
+
+RAMP_TIME_MS : f32 : 100.0
+
+ramped_value_new_target :: proc (value: ^RampedValue, new_target: f32, samplerate: f32) {
+    value.target = new_target
+    value.step_heigth = abs(value.current_value - new_target)/(RAMP_TIME_MS * 0.001 * samplerate)
+}
+
+ramped_value_step :: proc(value: ^RampedValue) -> f32 {
+    
+    if value.target == value.current_value {
+        return value.current_value
+    }
+
+    distance = value.target - value.current_value
+    
+    if value.step_height >= abs(distance) {
+        value.current_value = value.target
+        return value.current_value
+    }
+    value.current_value += sign(distance)*value.step_heigth
+    return value.current_value
+}
+
+ramped_value_fill_buffer :: proc(value: ^RampedValue, nsamples: u32) {
+    
+    for index in 0..<nsamples {
+        value.value_buffer[index] = ramped_value.step(value)
+    }
+}
+
+
+
+ParamEventType :: enum {
+    GUI_VALUE_CHANGE,
+    GUI_GESTURE_BEGIN,
+    GUI_GESTURE_END,
+}
+
+ParamEvent :: struct {
+    param_index: ParamIDs,
+    event_type: ParamEventType,
+    value: f32,
+}
+
+FIFO_SIZE :: 256
+EventFIFO :: struct {
+    events: [FIFO_SIZE]ParamEvent,
+    write_index: u32,
+    read_index: u32
+}
 
 GUI :: struct {}
 
 Reverb :: struct {}
 
-PluginData :: struct {
+Echo :: struct {
     
-    // context: ^runtime.Context
-    
+    bufferL: []f32,
+    bufferR: []f32,
+    buffer_size: u32,
+    write_index: u32,
+    delay_frac: f32,
+}
+
+/*
+objet Arena
+arena_init_growing(Arena)
+allocator = arena_allocator(^Arena)
+*/
+
+PluginData :: struct {        
     plugin: clap.Plugin,
     host: ^clap.Host,
     host_params: ^clap_ext.Host_Params,
@@ -54,8 +158,35 @@ PluginData :: struct {
     
     main_to_audio_fifo: EventFIFO,
 
+    main_arena: vmem.Arena,
+    echo_arena: vmem.Arena,
+    echo: Echo,
     reverb: Reverb,
     gui: GUI,
+}
+
+
+echo_set_delay :: proc(echo: ^Echo, delay_ms: f32, samplerate: f32) {
+    delay_ms := clamp(delay_ms, parameter_infos[ParamIDs.Time].min, parameter_infos[ParamIDs.Time].max)
+    echo.delay_frac = delay_ms * 0.001 * samplerate
+}
+
+echo_read_sample :: proc(buffer: []f32, read_position: f32) -> f32 {
+    read_position := read_position
+
+    if read_position < 0.0 { read_position += f32(len(buffer)) }
+    
+    read_index1 := int(read_position)
+    read_index2 := read_index1 - 1
+    
+    if read_index2 < 0 { read_index2 += len(buffer) }
+    
+    interp_coeff := read_position - f32(read_index1)
+    sample1 := buffer[read_index1]
+    sample2 := buffer[read_index2]
+    
+    output_sample := math.lerp(sample1, sample2, interp_coeff)
+    return output_sample
 }
 
 get_audio_ports_count :: proc "c" (plugin: ^clap.Plugin, is_input: bool) -> u32 { return 1 }
@@ -82,16 +213,20 @@ audio_port_extension := clap_ext.Plugin_Audio_Ports {
 
 get_num_params :: proc "c" (plugin: ^clap.Plugin) -> u32 { return cast(u32)ParamIDs.NParams }
 
-params_get_info :: proc "c" (plugin: ^clap.Plugin, param_index: u32, param_info: ^clap_ext.Param_Info) -> bool {
+params_get_info :: proc "c" (plugin: ^clap.Plugin, param_index: u32, information: ^clap_ext.Param_Info) -> bool {
     if param_index >= cast(u32)ParamIDs.NParams { return false }
     
-    mem.zero(param_info, size_of(param_info^))
-    param_info.id = param_index 
-    param_info.flags = .AUTOMATABLE
-    param_info.min_value = 0.0
-    param_info.max_value = 1.0
-    param_info.default_value = 0.5
-    // le nom
+    mem.zero(information, size_of(information^))
+    information.id = param_index 
+    information.flags = parameter_infos[param_index].clap_param_flags
+    information.min_value = f64(parameter_infos[param_index].min)
+    information.max_value = f64(parameter_infos[param_index].max)
+    information.default_value = f64(parameter_infos[param_index].default_value)
+    
+    name := parameter_infos[param_index].name
+    for char_index in 0..<len(name) {
+        information.name[char_index] = raw_data(name)[char_index]
+    }
     
     return true
 }
@@ -115,11 +250,11 @@ param_convert_value_to_text :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Cl
     out_string := strings.string_from_ptr(out_buffer, int(out_buffer_capacity))
     
     switch param_index {
-        case .Decay: {
+        case .Time: {
             fmt.bprintf(transmute([]u8)out_string, "%d sec", value)
             return true
         }
-        case .Tone: {
+        case .Feedback: {
             fmt.bprintf(transmute([]u8)out_string, "%d Hz", value)
             return true
         }
@@ -227,6 +362,16 @@ plugin_init :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
     
     // init 
+    for param_id, param_index in ParamIDs {
+        
+        if param_id == .NParams { break }
+    
+        information: clap_ext.Param_Info
+        
+        params_get_info(_plugin, u32(param_index), &information)
+        plugin.main_param_values[param_index] = f32(information.default_value)
+        plugin.audio_param_values[param_index] = f32(information.default_value)
+    }
 
     plugin.host_params = transmute(^clap_ext.Host_Params)plugin.host.get_extension(plugin.host, clap_ext.EXT_PARAMS)
     return true
@@ -241,9 +386,36 @@ plugin_destroy :: proc "c" (_plugin: ^clap.Plugin) {
 
 plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_size: u32, max_buffer_size: u32) -> bool { 
     plugin := transmute(^PluginData)_plugin.plugin_data
+    context = runtime.default_context()
+    
     plugin.samplerate = cast(f32)samplerate
     plugin.min_buffer_size = min_buffer_size
     plugin.max_buffer_size = max_buffer_size
+    
+    {
+        error := vmem.arena_init_growing(&plugin.main_arena, 4 * mem.Megabyte)
+        ensure(error == nil)
+        
+        // init les ramped values avec les buffers
+        
+    }
+    
+    {
+        error := vmem.arena_init_growing(&plugin.echo_arena, 4 * mem.Megabyte)
+        ensure(error == nil)
+    
+        allocator := vmem.arena_allocator(&plugin.echo_arena)
+    
+        echo := &plugin.echo
+        echo.buffer_size = u32(parameter_infos[ParamIDs.Time].max * 0.001 * plugin.samplerate)
+        echo.bufferL = make([]f32, echo.buffer_size, allocator)
+        echo.bufferR = make([]f32, echo.buffer_size, allocator)
+        
+        echo.write_index = 0
+        echo.delay_frac = 0
+        
+        echo_set_delay(echo, plugin.audio_param_values[ParamIDs.Time], plugin.samplerate)
+    }
     
     // init et alloue tous ce qui a besoin de la samplerate ou de la block size
     
@@ -252,6 +424,14 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
 
 plugin_deactivate :: proc "c" (_plugin: ^clap.Plugin) {
     // desalloue tout ce a été alloué dans activate
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    context = runtime.default_context()
+
+    vmem.arena_destroy(&plugin.main_arena)
+    
+    vmem.arena_destroy(&plugin.echo_arena)
+    plugin.echo.bufferL = nil
+    plugin.echo.bufferR = nil
 }
 
 plugin_start_processing :: proc "c" (_plugin: ^clap.Plugin) -> bool { return true }
@@ -259,6 +439,15 @@ plugin_start_processing :: proc "c" (_plugin: ^clap.Plugin) -> bool { return tru
 plugin_stop_processing :: proc "c" (_plugin: ^clap.Plugin) {}
 
 plugin_reset :: proc "c" (_plugin: ^clap.Plugin) {}
+
+process_event :: proc(plugin: ^PluginData, event: ^clap.Event_Header) {
+    
+    if event.space_id == clap.CORE_EVENT_SPACE_ID && event.event_type == clap.Event_Type.PARAM_VALUE {
+        param_event := transmute(^clap.Event_Param_Value)event
+        
+        plugin.audio_param_values[param_event.param_id] = f32(param_event.value)
+    }
+}
 
 plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> clap.Process_Status { 
     plugin := transmute(^PluginData)_plugin.plugin_data
@@ -282,7 +471,7 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
                 break
             }
             
-            // process event 
+            process_event(plugin, event)
             event_index += 1
             
             if event_index == input_event_count {
@@ -302,10 +491,33 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
             outputL : []f32 = process.audio_outputs[0].data32[0][current_frame_index:current_frame_index + nsamples]
             outputR : []f32 = process.audio_outputs[0].data32[1][current_frame_index:current_frame_index + nsamples]
             
+            echo := &plugin.echo
             
             for index in 0..<nsamples {
-                outputL[index] = inputL[index]
-                outputR[index] = inputR[index]
+            
+                // traiter les smooths params
+                delay_ms := plugin.audio_param_values[ParamIDs.Time]  
+                feedback := plugin.audio_param_values[ParamIDs.Feedback]
+                mix := plugin.audio_param_values[ParamIDs.Mix]
+                
+                echo_set_delay(echo, delay_ms, plugin.samplerate)
+                
+                read_index_frac := f32(echo.write_index) - echo.delay_frac
+                output_sampleL := echo_read_sample(echo.bufferL, read_index_frac)
+                output_sampleR := echo_read_sample(echo.bufferR, read_index_frac)
+                
+                input_sampleL := inputL[index]
+                input_sampleR := inputR[index]
+                
+                outputL[index] = math.lerp(output_sampleL, input_sampleL, mix)
+                outputR[index] = math.lerp(output_sampleR, input_sampleR, mix)
+                
+                echo.bufferL[echo.write_index] = input_sampleL + output_sampleL * feedback
+                echo.bufferR[echo.write_index] = input_sampleR + output_sampleR * feedback
+                
+                echo.write_index += 1
+                if echo.write_index == echo.buffer_size { echo.write_index = 0 }
+                
             }
         }
         

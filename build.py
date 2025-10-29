@@ -1,12 +1,15 @@
 import os
 import os.path
+import sys
+
+def Print(message): print(message, file = sys.stdout, flush = True)
 
 def run(command):
-    print(command)
+    Print(command)
     result = os.system(command)
 
     if result != 0:
-        print("Error during command execution, exiting")
+        Print("Error during command execution, exiting")
         exit(-1)
 
     return
@@ -15,12 +18,7 @@ def run(command):
 def build_plugin_code(debug: bool):
     # command = f"odin build source -out:build/plugin_code.lib -debug -pdb-name:build/plugin_code.pdb -build-mode:lib -vet-semicolon"
     command = f"odin build source -out:build/odin_code/plugin_code.obj -debug -build-mode:object -vet-semicolon"
-    print(command)
-    result = os.system(command)
-
-    if result != 0:
-        exit(-1)
-
+    run(command)
     return
 
 
@@ -119,11 +117,11 @@ def build_vstsdk(debug: bool):
     compile_command = f"cl {flags} {defines} {includes} {sources} /Fo:{build_dir}/ /Fd:{build_dir}/vstsdk.pdb"
 
     link_command = f"Lib.exe /OUT:build/base-sdk-vst3.lib /NOLOGO /MACHINE:X64 /machine:x64 {build_dir}/*.obj"
-    print("Compiling the vst3 sdk")
+    Print("Compiling the vst3 sdk")
     run(compile_command)
-    print("Linking the vst3 sdk -> base-sdk-vst3.lib")
+    Print("Linking the vst3 sdk -> base-sdk-vst3.lib")
     run(link_command)
-    print("\n\n")
+    Print("\n\n")
 
     return
 
@@ -179,14 +177,14 @@ def build_wrapper(debug: bool):
 
     compile_command = f"cl.exe {flags} {defines} {includes} {sources} /Fo:{build_dir}/ /Fd:{build_dir}/clap-wrapper.pdb"
 
-    print("Compiling the clap wrapper")
+    Print("Compiling the clap wrapper")
     run(compile_command)
 
     link_command = f"Lib.exe /OUT:build/clap-wrapper.lib /NOLOGO /MACHINE:X64 /machine:x64 {build_dir}/*.obj"
 
-    print("Linking clap wrapper -> clap-wrapper.lib")
+    Print("Linking clap wrapper -> clap-wrapper.lib")
     run(link_command)
-    print("\n\n")
+    Print("\n\n")
 
     return
 
@@ -229,7 +227,7 @@ def final_build(debug: bool):
 
     compile_command = f"cl.exe {flags} {defines} {includes} {sources} /Fo:{build_dir}/ /Fd:{build_dir}/vc143.pdb"
 
-    print("Entry point compilation")
+    Print("Entry point compilation")
     run(compile_command)
 
 
@@ -254,7 +252,7 @@ def final_build(debug: bool):
         "build/odin_code/*.obj",
     ])
 
-    print("Final Linking")
+    Print("Final Linking")
     link_command = f"link.exe {flags} {libs} /OUT:build/clap_ambient.vst3 /ILK:build/clap_ambient.ilk /PDB:build/clap_ambient.pdb /IMPLIB:build/clap_ambient_vst3.lib {object_files}"
     run(link_command)
 
@@ -271,7 +269,7 @@ def main():
     # build_wrapper(True)
     final_build(True)
 
-    print("Done")
+    Print("Done")
     return
 
 
