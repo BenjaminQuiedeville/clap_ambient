@@ -124,8 +124,20 @@
             },
             {
                 "box": {
+                    "clipheight": 33.0,
                     "data": {
                         "clips": [
+                            {
+                                "absolutepath": "LazyBallade.wav",
+                                "filename": "LazyBallade.wav",
+                                "filekind": "audiofile",
+                                "id": "u119000441",
+                                "selection": [ 0.0, 1.0 ],
+                                "loop": 1,
+                                "content_state": {
+                                    "loop": 1
+                                }
+                            },
                             {
                                 "absolutepath": "Snare 01.wav",
                                 "filename": "Snare 01.wav",
@@ -146,7 +158,7 @@
                     "numoutlets": 5,
                     "outlettype": [ "signal", "signal", "signal", "", "dictionary" ],
                     "parameter_enable": 0,
-                    "patching_rect": [ 809.0, 80.0, 150.0, 30.0 ],
+                    "patching_rect": [ 649.0, 64.0, 285.0, 68.0 ],
                     "quality": "basic",
                     "saved_attribute_attributes": {
                         "candicane2": {
@@ -182,57 +194,6 @@
                     "outlettype": [ "bang" ],
                     "patching_rect": [ 476.0, 151.0, 58.0, 22.0 ],
                     "text": "loadbang"
-                }
-            },
-            {
-                "box": {
-                    "data": {
-                        "clips": [
-                            {
-                                "absolutepath": "framedrum_sliding.mp3",
-                                "filename": "framedrum_sliding.mp3",
-                                "filekind": "audiofile",
-                                "id": "u190000413",
-                                "selection": [ 0.0, 1.0 ],
-                                "loop": 1,
-                                "content_state": {
-                                    "loop": 1
-                                }
-                            }
-                        ]
-                    },
-                    "id": "obj-9",
-                    "maxclass": "playlist~",
-                    "mode": "basic",
-                    "numinlets": 1,
-                    "numoutlets": 5,
-                    "outlettype": [ "signal", "signal", "signal", "", "dictionary" ],
-                    "parameter_enable": 0,
-                    "patching_rect": [ 554.0, 45.0, 150.0, 30.0 ],
-                    "quality": "basic",
-                    "saved_attribute_attributes": {
-                        "candicane2": {
-                            "expression": ""
-                        },
-                        "candicane3": {
-                            "expression": ""
-                        },
-                        "candicane4": {
-                            "expression": ""
-                        },
-                        "candicane5": {
-                            "expression": ""
-                        },
-                        "candicane6": {
-                            "expression": ""
-                        },
-                        "candicane7": {
-                            "expression": ""
-                        },
-                        "candicane8": {
-                            "expression": ""
-                        }
-                    }
                 }
             },
             {
@@ -289,7 +250,7 @@
                     "numoutlets": 8,
                     "offset": [ 0.0, 0.0 ],
                     "outlettype": [ "signal", "signal", "", "list", "int", "", "", "" ],
-                    "patching_rect": [ 416.0, 229.0, 435.0, 188.0 ],
+                    "patching_rect": [ 416.0, 234.0, 455.0, 245.0 ],
                     "save": [ "#N", "vst~", "loaduniqueid", 0, "D:/Dev/clap/clap_ambient/build/clap_ambient.vst3", ";" ],
                     "saved_attribute_attributes": {
                         "valueof": {
@@ -322,8 +283,8 @@
                             "isbank": 0,
                             "isbase64": 1,
                             "sliderorder": [],
-                            "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 0 ],
-                            "blob": "159.VMjLgXI....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9LiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKt3hKt3hKtX2St3hKtrhKt3hK4LjKt3hKtvyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
+                            "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0 ],
+                            "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hcO4hKt3xJt3hKt3hKt3hKt3hKt3hYq3hKt3hKtvyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
                         },
                         "snapshotlist": {
                             "current_snapshot": 0,
@@ -346,8 +307,8 @@
                                         "isbank": 0,
                                         "isbase64": 1,
                                         "sliderorder": [],
-                                        "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 0 ],
-                                        "blob": "159.VMjLgXI....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9LiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKt3hKt3hKtX2St3hKtrhKt3hK4LjKt3hKtvyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
+                                        "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0 ],
+                                        "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hcO4hKt3xJt3hKt3hKt3hKt3hKt3hYq3hKt3hKtvyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
                                     },
                                     "fileref": {
                                         "name": "Clap Ambient",
@@ -880,31 +841,11 @@
                     "destination": [ "obj-2", 0 ],
                     "source": [ "obj-6", 0 ]
                 }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-1", 1 ],
-                    "source": [ "obj-9", 1 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-1", 0 ],
-                    "source": [ "obj-9", 0 ]
-                }
             }
         ],
         "parameters": {
             "obj-1": [ "vst~", "vst~", 0 ],
             "obj-17": [ "live.gain~[1]", "OutLevel", 0 ],
-            "parameterbanks": {
-                "0": {
-                    "index": 0,
-                    "name": "",
-                    "parameters": [ "-", "-", "-", "-", "-", "-", "-", "-" ],
-                    "buttons": [ "-", "-", "-", "-", "-", "-", "-", "-" ]
-                }
-            },
             "inherited_shortname": 1
         },
         "autosave": 0,

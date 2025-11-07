@@ -26,7 +26,7 @@ import clap_ext "../clap-odin/ext"
 // pourquoi pas dans le fond afficher le spectre de sortie ou une animation rigolote (apprendre opengl imagine)
 
 
-ParamIDs :: enum u32 {
+ParamIDs :: enum {
 
     //Global 
     InGain,
@@ -34,12 +34,17 @@ ParamIDs :: enum u32 {
     
     // echo 
     EchoTime,
-    EchoFeedback, 
+    EchoFeedback,
+    EchoTone,
+    EchoModFreq,
+    EchoModAmount,
     EchoMix,
     
     //reverb
     ReverbDecay,
     ReverbSize,
+    ReverbEarlyDiffusion,
+    ReverbLateDiffusion,
     ReverbTone,
     ReverbMix,
 }
@@ -76,6 +81,21 @@ parameter_infos := [ParamIDs]ParamInfo {
         imgui_flags = 0,
         clap_param_flags = .AUTOMATABLE
     },
+    .EchoTone = {
+        name = "Echo tone", min = 0.0, max = 20000.0, default_value = 20000.0,
+        imgui_flags = 0, // @TODO logarithmic
+        clap_param_flags = .AUTOMATABLE,
+    },
+    .EchoModFreq = {
+        name = "Echo mod freq", min = 0.0, max = 10.0, default_value = 1.0,
+        imgui_flags = 0,
+        clap_param_flags = .AUTOMATABLE,
+    },
+    .EchoModAmount = {
+        name = "Echo mod amount", min = 0.0, max = 1.0, default_value = 0.0,
+        imgui_flags = 0,
+        clap_param_flags = .AUTOMATABLE,
+    },
     .EchoMix = {
         name = "Mix", min = 0.0, max = 1.0, default_value = 0.0,
         imgui_flags = 0,
@@ -92,6 +112,8 @@ parameter_infos := [ParamIDs]ParamInfo {
         imgui_flags = 0,
         clap_param_flags = .AUTOMATABLE,
     },
+    .ReverbEarlyDiffusion = {},
+    .ReverbLateDiffusion = {},
     .ReverbTone = {
         name = "Reverb Tone", min = 0.0, max = 1.0, default_value = 1.0,
         imgui_flags = 0,
@@ -100,6 +122,12 @@ parameter_infos := [ParamIDs]ParamInfo {
     .ReverbMix = {},
 }
 
+PIf32 :: f32(math.PI)
+PI_4f32 :: f32(math.PI / 4)
+
+dbtoa :: #force_inline proc(x: f32) -> f32 { return math.pow(10.0, x * 0.05) }
+atodb :: #force_inline proc(x: f32) -> f32 { return 20.0 * math.log10(x) }
+
 RampedValue :: struct {
     target: f32,
     current_value: f32,
@@ -107,12 +135,12 @@ RampedValue :: struct {
     value_buffer: []f32,
 }
 
-ramped_value_init :: proc(value: ^RampedValue, init_value: f32, buffer_size: u32, arena: ^vmem.Arena) {
+ramped_value_init :: proc(value: ^RampedValue, init_value: f32, buffer_size: u32, allocator: runtime.Allocator) {
 
     value.target = init_value
     value.step_height = 0.0
     value.current_value = init_value
-    value.value_buffer = make([]f32, buffer_size, vmem.arena_allocator(arena))
+    value.value_buffer = make([]f32, buffer_size, allocator)
 }
 
 RAMP_TIME_MS : f32 : 100.0
@@ -188,9 +216,6 @@ main_push_event_to_audio :: proc(plugin: ^PluginData, param_index: ParamIDs, eve
     intrin.atomic_and(&plugin.main_to_audio_fifo.write_index, FIFO_SIZE-1)
 }
 
-GUI :: struct {}
-
-
 DelayLine :: struct {
     buffer: []f32,
     write_index: u32,
@@ -263,36 +288,293 @@ Reverb :: struct {
 Echo :: struct {
     delay_lineL: DelayLine,
     delay_lineR: DelayLine,
-    delay_frac: f32,
-    tonefilter: Biquad,
+    delay_frac: RampedValue,
+    feedback: RampedValue,
+    mix: RampedValue,
+    tone_filter: Biquad,
+    lfo: LFO,
+    mod_amount: f32
 }
+
+echo_process :: proc(echo: ^Echo, bufferL: []f32, bufferR: []f32) {
+        
+    nsamples := u32(len(bufferL))
+    
+    lfo_fill_buffers(&echo.lfo, nsamples)
+    ramped_value_fill_buffer(&echo.delay_frac, nsamples)    
+    ramped_value_fill_buffer(&echo.feedback, nsamples)
+    ramped_value_fill_buffer(&echo.mix, nsamples)
+        
+    for index in 0..<nsamples {
+        
+        mod_value := f64(echo.lfo.sin_buffer[index] * echo.mod_amount)
+        read_index_frac := f64(echo.delay_lineL.write_index) - f64(echo.delay_frac.value_buffer[index]) + mod_value
+        
+        in_sampleL := bufferL[index]
+        in_sampleR := bufferR[index]
+        
+        output_sampleL := delay_line_read_sample_lagrange(echo.delay_lineL, f32(read_index_frac))
+        output_sampleR := delay_line_read_sample_lagrange(echo.delay_lineR, f32(read_index_frac))
+            
+        bufferL[index] = math.lerp(in_sampleL, output_sampleL, echo.mix.value_buffer[index])
+        bufferR[index] = math.lerp(in_sampleR, output_sampleR, echo.mix.value_buffer[index])
+        
+        feedback_sampleL := in_sampleL + output_sampleL * echo.feedback.value_buffer[index]
+        feedback_sampleR := in_sampleR + output_sampleR * echo.feedback.value_buffer[index]
+    
+        feedback_sampleL = biquad_process_sampleL(&echo.tone_filter, feedback_sampleL)
+        feedback_sampleR = biquad_process_sampleL(&echo.tone_filter, feedback_sampleR)
+    
+        delay_line_push_sample(&echo.delay_lineL, feedback_sampleL)
+        delay_line_push_sample(&echo.delay_lineR, feedback_sampleR)
+    }
+}
+
 
 
 compute_delay_frac :: proc(delay_ms, samplerate: f32) -> f32 {
     return delay_ms * 0.001 * samplerate
 }
 
-MultiTapEcho :: struct {}
+// MultiTapEcho :: struct {}
+
+LFO :: struct {
+    cos_value: f32,
+    sin_value: f32,
+    param: f32,
+    cos_buffer: []f32,
+    sin_buffer: []f32,
+}
+
+lfo_init :: proc(lfo: ^LFO, freq: f32, samplerate: f32, buffer_size: u32, allocator: runtime.Allocator) {
+
+    lfo.cos_value = 0.5
+    
+    lfo.cos_buffer = make([]f32, buffer_size, allocator)
+    lfo.sin_buffer = make([]f32, buffer_size, allocator)
+
+    lfo_set_frequency(lfo, freq, samplerate)
+}
+
+lfo_set_frequency :: #force_inline proc (lfo: ^LFO, freq: f32, samplerate: f32) {
+    lfo.param = 2.0 * math.sin(PIf32 * freq/samplerate)
+}
+
+lfo_fill_buffers :: proc(lfo: ^LFO, nsamples: u32) {
+    for index in 0..<nsamples {
+        lfo_step(lfo, index)
+    }
+}
+
+lfo_step :: #force_inline proc(lfo: ^LFO, index: u32) {
+    lfo.cos_value -= lfo.param * lfo.sin_value
+    lfo.sin_value += lfo.param * lfo.cos_value
+    
+    lfo.cos_buffer[index] = lfo.cos_value
+    lfo.sin_buffer[index] = lfo.sin_value
+}
 
 Biquad :: struct {
     b0, b1, b2: f32,
     a1, a2: f32, 
+    gain: f32,
     w1L, w2L: f32,
     w1R, w2R: f32,
 }
 
-make_lowpass1 :: proc(f: ^Biquad, freq: f32, samplerate: f32) {}
-make_highpass1 :: proc(f: ^Biquad, freq: f32, samplerate: f32) {}
-make_lowshelf1 :: proc(f: ^Biquad, freq: f32, gain_db: f32, samplerate: f32) {}
-make_highshelf1 :: proc(f: ^Biquad, freq: f32, gain_db: f32, samplerate: f32) {}
+biquad_reset :: proc(f: ^Biquad) {
+    f.w1L = 0.0
+    f.w2L = 0.0
+    f.w1R = 0.0
+    f.w2R = 0.0
+}
 
-make_lowpass2 :: proc(f: ^Biquad, freq: f32, Q: f32, samplerate: f32) {}
-make_highpass2 :: proc(f: ^Biquad, freq: f32, Q: f32, samplerate: f32) {}
-make_lowshelf2 :: proc(f: ^Biquad, freq: f32, Q: f32, gain_db: f32, samplerate: f32) {}
-make_highshelf2 :: proc(f: ^Biquad, freq: f32, Q: f32, gain_db: f32, samplerate: f32) {}
-make_peak :: proc(f: ^Biquad, freq: f32, Q: f32, gain_db: f32, samplerate: f32) {}
+make_lowpass1 :: proc(f: ^Biquad, freq: f32, samplerate: f32) {
+    K := math.tan(f32(math.PI) * freq/samplerate)
+    
+    inv_a0 := 1.0/(K+1)
+    
+    f.b0 = K * inv_a0
+    f.b1 = f.b0
+    f.b2 = 0.0
+    f.a1 = -(K-1.0) * inv_a0
+    f.a2 = 0.0
+    f.gain = 1.0
+}
 
-biquad_process :: proc(f: ^Biquad, bufferL: []f32, bufferR: []f32) {}
+make_highpass1 :: proc(f: ^Biquad, freq: f32, samplerate: f32) {
+    K := math.tan(f32(math.PI) * freq/samplerate)
+    
+    inv_a0 := 1.0/(K+1)
+    
+    f.b0 = inv_a0
+    f.b1 = -f.b0
+    f.b2 = 0.0
+    f.a1 = -(K-1.0) * inv_a0
+    f.a2 = 0.0
+    f.gain = 1.0
+}
+
+make_lowshelf1 :: proc(f: ^Biquad, freq: f32, gain_db: f32, samplerate: f32) {
+    f.gain = dbtoa(gain_db)
+    gainLinear := dbtoa(-gain_db)
+    
+    freqRadian := freq / samplerate * PIf32
+
+    eta := (gainLinear + 1.0)/(gainLinear - 1.0)
+    rho := math.sin(PIf32 * freqRadian * 0.5 - PI_4f32) / math.sin(PIf32 * freqRadian * 0.5 + PI_4f32)
+
+    etaSign : f32 = eta > 0.0 ? 1.0 : -1.0
+    alpha1 := gainLinear == 1.0 ? 0.0 : eta - etaSign*math.sqrt(eta*eta - 1.0)
+
+    beta0 := ((1 + gainLinear) + (1 - gainLinear) * alpha1) * 0.5
+    beta1 := ((1 - gainLinear) + (1 + gainLinear) * alpha1) * 0.5
+
+    f.b0 = (beta0 + rho * beta1)/(1 + rho * alpha1)
+    f.b1 = (beta1 + rho * beta0)/(1 + rho * alpha1)
+    f.b2 = 0.0
+    f.a1 = -(rho + alpha1)/(1 + rho * alpha1)
+    f.a2 = 0.0
+}
+
+make_highshelf1 :: proc(f: ^Biquad, freq: f32, gain_db: f32, samplerate: f32) {
+    f.gain = 1.0
+    gainLinear := dbtoa(gain_db)
+
+    freqRadian := freq / samplerate * PIf32
+
+    eta := (gainLinear + 1.0)/(gainLinear - 1.0)
+    rho := math.sin(PIf32 * freqRadian * 0.5 - PI_4f32) / math.sin(PIf32 * freqRadian * 0.5 + PI_4f32)
+
+    etaSign : f32 = eta > 0.0 ? 1.0 : -1.0
+    alpha1 := gainLinear == 1.0 ? 0.0 : eta - etaSign*math.sqrt(eta*eta - 1.0)
+
+    beta0 := ((1 + gainLinear) + (1 - gainLinear) * alpha1) * 0.5
+    beta1 := ((1 - gainLinear) + (1 + gainLinear) * alpha1) * 0.5
+
+    f.b0 = (beta0 + rho * beta1)/(1 + rho * alpha1)
+    f.b1 = (beta1 + rho * beta0)/(1 + rho * alpha1)
+    f.b2 = 0.0
+    f.a1 = -(rho + alpha1)/(1 + rho * alpha1)
+    f.a2 = 0.0
+}
+
+make_lowpass2 :: proc(f: ^Biquad, freq: f32, Q: f32, samplerate: f32) {
+    w0 := 2 * PIf32 / samplerate * freq
+    cosw0 := math.cos(w0)
+    sinw0 := math.sin(w0)
+
+    alpha := sinw0/(2.0*Q)
+
+    a0inv := 1.0/(1.0 + alpha)
+
+    f.b0 = (1.0 - cosw0) * 0.5 * a0inv
+    f.b1 = 2.0 * f.b0
+    f.b2 = f.b0
+    f.a1 = 2.0 * cosw0 * a0inv
+    f.a2 = -(1.0 - alpha) * a0inv
+}
+
+make_highpass2 :: proc(f: ^Biquad, freq: f32, Q: f32, samplerate: f32) {
+
+    w0 := 2 * PIf32 / samplerate * freq
+    cosw0 := math.cos(w0)
+    sinw0 := math.sin(w0)
+
+    alpha := sinw0/(2.0*Q)
+
+    a0inv := 1.0/(1.0 + alpha)
+    
+    f.b0 = (1.0 + cosw0) * 0.5 * a0inv
+    f.b1 = -2.0 * f.b0
+    f.b2 = f.b0
+    f.a1 = 2.0 * cosw0 * a0inv
+    f.a2 = -(1.0 - alpha) * a0inv
+}
+
+make_lowshelf2 :: proc(f: ^Biquad, freq: f32, Q: f32, gain_dB: f32, samplerate: f32) {
+
+    w0 := 2 * PIf32 / samplerate * freq
+    cosw0 := math.cos(w0)
+    sinw0 := math.sin(w0)
+
+    A := math.pow(f32(10.0), gain_dB/40.0)
+    beta := math.sqrt(A)/Q
+    a0inv := 1/((A+1) + (A-1)*cosw0 + beta*sinw0)
+
+    f.b0 = (A*((A+1) - (A-1)*cosw0 + beta*sinw0)) * a0inv
+    f.b1 = (2*A*((A-1) - (A+1)*cosw0)) * a0inv
+    f.b2 = (A*((A+1) - (A-1)*cosw0 - beta*sinw0)) * a0inv
+    f.a1 = -(-2*((A-1) + (A+1)*cosw0)) * a0inv
+    f.a2 = -((A+1) + (A-1)*cosw0 - beta*sinw0) * a0inv
+}
+
+make_highshelf2 :: proc(f: ^Biquad, freq: f32, Q: f32, gain_dB: f32, samplerate: f32) {
+    w0 := 2 * PIf32 / samplerate * freq
+    cosw0 := math.cos(w0)
+    sinw0 := math.sin(w0)
+
+    A := math.pow(f32(10.0), gain_dB/40.0)
+    beta := math.sqrt(A)/Q
+    a0inv := 1/((A+1) + (A-1)*cosw0 + beta*sinw0)
+    
+
+    f.b0 = (A*((A+1) + (A-1)*cosw0 + beta*sinw0)) * a0inv
+    f.b1 = (-2*A*((A-1) + (A+1)*cosw0)) * a0inv
+    f.b2 = (A*((A+1) + (A-1)*cosw0 - beta*sinw0)) * a0inv
+    f.a1 = -(2*((A-1) - (A+1)*cosw0)) * a0inv
+    f.a2 = -((A+1) - (A-1)*cosw0 - beta*sinw0) * a0inv
+}
+
+make_peak :: proc(f: ^Biquad, freq: f32, Q: f32, gain_dB: f32, samplerate: f32) {
+    w0 := 2 * PIf32 / samplerate * freq
+    cosw0 := math.cos(w0)
+    sinw0 := math.sin(w0)
+
+    A := math.pow(f32(10.0), gain_dB/40.0)
+    beta := math.sqrt(A)/Q
+    alpha := sinw0 / (2.0 * Q)
+    a0inv := 1/(1 + alpha/A)
+
+    f.b0 = (1.0 + alpha * A) * a0inv
+    f.b1 = -2.0 * cosw0 * a0inv
+    f.b2 = (1.0 - alpha * A) * a0inv
+    f.a1 = -f.b1
+    f.a2 = -(1.0 - alpha / A) * a0inv
+}
+
+biquad_process_sampleL :: #force_inline proc(f: ^Biquad, sample: f32) -> f32 {
+    w := sample + f.a1*f.w1L + f.a2*f.w2L
+    out_sample := f.b0*w + f.b1*f.w1L + f.b2*f.w2L
+    
+    f.w2L = f.w1L
+    f.w1L = w
+    return out_sample
+}
+
+biquad_process_sampleR :: #force_inline proc(f: ^Biquad, sample: f32) -> f32 {    
+    w := sample + f.a1*f.w1R + f.a2*f.w2R
+    out_sample := f.b0*w + f.b1*f.w1R + f.b2*f.w2R
+    
+    f.w2R = f.w1R
+    f.w1R = w
+    return out_sample
+}
+
+biquad_process :: proc(f: ^Biquad, bufferL: []f32, bufferR: []f32) {
+
+    assert(bufferL != nil)
+    
+    for index in 0..<len(bufferL) {
+        bufferL[index] = biquad_process_sampleL(f, bufferL[index])
+    }
+    
+    if bufferR != nil {
+        for index in 0..<len(bufferR) {
+            bufferR[index] = biquad_process_sampleR(f, bufferR[index])
+        }
+    }
+}
 
 AllpassDelay :: struct {
     delay_line: DelayLine,
@@ -300,8 +582,14 @@ AllpassDelay :: struct {
     delay_frac: f32
 }
 
+allpass_process_buffer :: proc(ap: ^AllpassDelay, buffer: []f32) {
+    
+    for index in 0..<len(buffer) {
+        buffer[index] = allpass_process_sample(ap, buffer[index])
+    }
+}
 
-allpass_delay_process_sample :: proc(ap: ^AllpassDelay, in_sample: f32) -> f32 {
+allpass_process_sample :: #force_inline proc(ap: ^AllpassDelay, in_sample: f32) -> f32 {
         
     // lire le buffer
     // output = delay_sample - input*gain
@@ -318,20 +606,27 @@ allpass_delay_process_sample :: proc(ap: ^AllpassDelay, in_sample: f32) -> f32 {
     return out_sample
 }
 
-AllpassDelayOrder2 :: struct {}
+AllpassDelayOrder2 :: struct {
+    delay_line1: DelayLine,
+    delay_line2: DelayLine,
+    gain1, gain2: f32,
+    delay_frac1, delay_frac2: f32
+}
+
+allpass2_process_buffer :: proc() {}
+allpass2_process_sample :: #force_inline proc() {}
+
+ProgenitorReverb :: struct {}
+
+
 FDN16 :: struct {}
 Looper :: struct {}
 
 GranularDelay :: struct {}
 
+GUI :: struct {}
 
-/*
-objet Arena
-arena_init_growing(Arena)
-allocator = arena_allocator(^Arena)
-*/
-
-PluginData :: struct {        
+PluginData :: struct {
     plugin: clap.Plugin,
     host: ^clap.Host,
     host_params: ^clap_ext.Host_Params,
@@ -342,7 +637,6 @@ PluginData :: struct {
 
     main_param_values: [ParamIDs]f32,
     audio_param_values: [ParamIDs]f32,
-    ramped_param_values: [ParamIDs]RampedValue,    
     
     main_to_audio_fifo: EventFIFO,
 
@@ -412,36 +706,33 @@ param_get_value :: proc "c" (_plugin: ^clap.Plugin, param_id: clap.Clap_Id, out_
 }
 
 param_convert_value_to_text :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, value: f64, out_buffer: [^]u8, out_buffer_capacity: u32) -> bool {
-    
     context = runtime.default_context()
 
     param_index := cast(ParamIDs)param_id
-    
+
     out_string := strings.string_from_ptr(out_buffer, int(out_buffer_capacity))
+    format_string: string
     
     switch param_index {
-        case .InGain, .OutGain: {
-            fmt.bprintf(transmute([]u8)out_string, "%.2f dB", value)
-            return true
-        }
-        case .EchoTime: {
-            fmt.bprintf(transmute([]u8)out_string, "%.2f ms", value)
-            return true
-        }
-        case .EchoFeedback: {
-            fmt.bprintf(transmute([]u8)out_string, "%.2f", value)
-            return true
-        }
-        case .EchoMix: {
-            fmt.bprintf(transmute([]u8)out_string, "%.2f", value)
-            return true
-        }
-        case .ReverbDecay: {}
-        case .ReverbSize: {}
-        case .ReverbTone: {}
-        case .ReverbMix: {}
+        case .InGain, .OutGain:     { format_string = "%.2f dB" }
+        case .EchoTime:             { format_string = "%.2f ms" }
+        case .EchoFeedback:         { format_string = "%.2f" }
+        case .EchoTone:             { format_string = "%.2f Hz" }
+        case .EchoModFreq:          { format_string = "%.2f Hz" }
+        case .EchoModAmount:        { format_string = "%.2f" }
+        case .EchoMix:              { format_string = "%.2f" }
+        
+        case .ReverbDecay:          { format_string = "%.2f" }
+        case .ReverbSize:           { format_string = "%.2f" }
+        case .ReverbEarlyDiffusion: { format_string = "%.2f" }
+        case .ReverbLateDiffusion:  { format_string = "%.2f" }
+        case .ReverbTone:           { format_string = "%.2f" }
+        case .ReverbMix:            { format_string = "%.2f" }
+        case: { return false }
     }
-    return false
+    fmt.bprintf(transmute([]u8)out_string, format_string, value)
+
+    return true
 }
 
 param_convert_text_to_value :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, param_value_text: cstring, out_value: ^f64) -> bool {
@@ -570,10 +861,7 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
     {
         error := vmem.arena_init_growing(&plugin.main_arena, 4 * mem.Megabyte)
         ensure(error == nil)
-                
-        for param_id, _ in ParamIDs {
-            ramped_value_init(&plugin.ramped_param_values[param_id], parameter_infos[param_id].default_value, max_buffer_size, &plugin.main_arena)
-        }
+        allocator := vmem.arena_allocator(&plugin.main_arena)
     }
     
     {
@@ -587,11 +875,19 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         echo.delay_lineL.buffer = make([]f32, buffer_size, allocator)
         echo.delay_lineR.buffer = make([]f32, buffer_size, allocator)
         
+        init_delay_frac := compute_delay_frac(parameter_infos[.EchoTime].default_value, plugin.samplerate)
+
+        ramped_value_init(&echo.delay_frac, init_delay_frac, max_buffer_size, allocator)
+        ramped_value_init(&echo.feedback, parameter_infos[.EchoFeedback].default_value, max_buffer_size, allocator)
+        ramped_value_init(&echo.mix, parameter_infos[.EchoMix].default_value, max_buffer_size, allocator)
+
         echo.delay_lineL.write_index = 0
         echo.delay_lineR.write_index = 0
-        echo.delay_frac = 0
         
-        echo.delay_frac = compute_delay_frac(plugin.audio_param_values[ParamIDs.EchoTime], plugin.samplerate)
+        lfo_init(&echo.lfo, 0.5, plugin.samplerate, max_buffer_size, allocator)
+        
+        make_lowpass1(&echo.tone_filter, 10000.0, plugin.samplerate)
+        biquad_reset(&echo.tone_filter)
     }
     
     // init et alloue tous ce qui a besoin de la samplerate ou de la block size
@@ -630,7 +926,41 @@ process_event :: proc(plugin: ^PluginData, event: ^clap.Event_Header) {
 
 handle_parameter_change :: proc(plugin: ^PluginData, param_index: ParamIDs, value: f32) {
     plugin.audio_param_values[param_index] = value
-    ramped_value_new_target(&plugin.ramped_param_values[param_index], value, plugin.samplerate)
+
+    switch param_index {
+        case .InGain: {
+        }
+        case .OutGain: {
+        }
+        case .EchoTime: {
+            new_delay_frac := compute_delay_frac(value, plugin.samplerate)
+            ramped_value_new_target(&plugin.echo.delay_frac, new_delay_frac, plugin.samplerate)
+        }
+        case .EchoFeedback: {
+            ramped_value_new_target(&plugin.echo.feedback, value, plugin.samplerate)
+        } 
+        case .EchoTone: {
+            make_lowpass1(&plugin.echo.tone_filter, value, plugin.samplerate)
+        }
+        case .EchoModFreq: {
+            lfo_set_frequency(&plugin.echo.lfo, value, plugin.samplerate)
+        }
+        case .EchoModAmount: {
+        
+            mod_max :: 100.0
+            plugin.echo.mod_amount = value * mod_max
+        }
+        case .EchoMix: {
+            ramped_value_new_target(&plugin.echo.mix, value, plugin.samplerate)
+        }
+        
+        case .ReverbDecay: {}
+        case .ReverbSize: {}
+        case .ReverbEarlyDiffusion: {}
+        case .ReverbLateDiffusion: {}
+        case .ReverbTone: {}
+        case .ReverbMix: {}
+    }    
 }
 
 sync_params_main_to_audio :: proc(plugin: ^PluginData, out_events: ^clap.Output_Events) {
@@ -745,39 +1075,12 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
             outputL : []f32 = process.audio_outputs[0].data32[0][current_frame_index:current_frame_index + nsamples]
             outputR : []f32 = process.audio_outputs[0].data32[1][current_frame_index:current_frame_index + nsamples]
             
-            for param_index, _ in ParamIDs {
-                ramped_value_fill_buffer(&plugin.ramped_param_values[param_index], nsamples)
-            }
             
-            echo := &plugin.echo
+            echo_process(&plugin.echo, inputL, inputR)
             
-            for index in 0..<nsamples {
             
-                // traiter les smooths params
-                delay_ms := plugin.ramped_param_values[ParamIDs.EchoTime].value_buffer[index]
-                feedback := plugin.ramped_param_values[ParamIDs.EchoFeedback].value_buffer[index]
-                mix := plugin.ramped_param_values[ParamIDs.EchoMix].value_buffer[index]
-                
-                echo.delay_frac = compute_delay_frac(delay_ms, plugin.samplerate)
-                
-                read_index_frac := f64(echo.delay_lineL.write_index) - f64(echo.delay_frac)
-                
-                output_sampleL := delay_line_read_sample_lagrange(echo.delay_lineL, f32(read_index_frac))
-                output_sampleR := delay_line_read_sample_lagrange(echo.delay_lineR, f32(read_index_frac))
-                
-                input_sampleL := inputL[index]
-                input_sampleR := inputR[index]
-                
-                outputL[index] = math.lerp(input_sampleL, output_sampleL, mix)
-                outputR[index] = math.lerp(input_sampleR, output_sampleR, mix)
-                
-                feedback_sampleL := input_sampleL + output_sampleL * feedback
-                feedback_sampleR := input_sampleR + output_sampleR * feedback
-
-                delay_line_push_sample(&echo.delay_lineL, feedback_sampleL)
-                delay_line_push_sample(&echo.delay_lineR, feedback_sampleR)
-                
-            }
+            copy(outputL, inputL)
+            copy(outputR, inputR)
         }
         
         current_frame_index = next_event_frame
