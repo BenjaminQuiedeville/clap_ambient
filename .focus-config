@@ -20,7 +20,7 @@ error_regex:            ^(?P<file>.*)\((?P<line>\d+):(?P<col>\d+)\) (?P<type>Err
 
 [Debug Build]   # <- command name. Can be arbitrary
 # build_command:          cmake --build build --config Debug  # should be an executable or a script
-build_command:          python build.py
+build_command:          python build.py debug
 build_working_dir:      %PROJECT_CONFIG_DIR%
 # timeout_in_seconds:     5             # if you don't want a timeout, don't specify it
 key_binding:            F5

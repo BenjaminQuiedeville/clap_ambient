@@ -260,6 +260,21 @@ def final_build(debug: bool):
 
 
 def main():
+    
+    argc = len(sys.argv)
+    
+    if argc == 1: 
+        Print("First call 'python build.py deps' to build the dependencies")
+        Print("Then call 'python build.py {debug|reldebug|release}' options to build the plugin")
+        exit(0)
+
+    # if argv[1] == "debug":
+                
+    # elif argv[1] == "reldebug":
+    #     exit(0)
+        
+    # elif argv[1] == "release":
+    #     exit(0)
 
     if not os.path.exists("build"):
         os.mkdir("build")

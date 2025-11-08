@@ -9,7 +9,7 @@
             "modernui": 1
         },
         "classnamespace": "box",
-        "rect": [ 34.0, 77.0, 1852.0, 939.0 ],
+        "rect": [ 134.0, 134.0, 1852.0, 939.0 ],
         "subpatcher_template": "empty_mixer",
         "boxes": [
             {
@@ -209,16 +209,6 @@
             },
             {
                 "box": {
-                    "id": "obj-8",
-                    "maxclass": "live.scope~",
-                    "numinlets": 2,
-                    "numoutlets": 1,
-                    "outlettype": [ "bang" ],
-                    "patching_rect": [ 150.0, 172.0, 184.0, 68.0 ]
-                }
-            },
-            {
-                "box": {
                     "id": "obj-7",
                     "maxclass": "live.scope~",
                     "numinlets": 2,
@@ -283,8 +273,8 @@
                             "isbank": 0,
                             "isbase64": 1,
                             "sliderorder": [],
-                            "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0 ],
-                            "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hcO4hKt3xJt3hKt3hKt3hKt3hKt3hYq3hKt3hKtvyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
+                            "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1 ],
+                            "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hcO4hKt3xJt3hKt3hKt3hKt3hKt3hYq3hKt3xMCwyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
                         },
                         "snapshotlist": {
                             "current_snapshot": 0,
@@ -307,8 +297,8 @@
                                         "isbank": 0,
                                         "isbase64": 1,
                                         "sliderorder": [],
-                                        "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0 ],
-                                        "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hcO4hKt3xJt3hKt3hKt3hKt3hKt3hYq3hKt3hKtvyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
+                                        "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1 ],
+                                        "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hcO4hKt3xJt3hKt3hKt3hKt3hKt3hYq3hKt3xMCwyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
                                     },
                                     "fileref": {
                                         "name": "Clap Ambient",
@@ -846,6 +836,14 @@
         "parameters": {
             "obj-1": [ "vst~", "vst~", 0 ],
             "obj-17": [ "live.gain~[1]", "OutLevel", 0 ],
+            "parameterbanks": {
+                "0": {
+                    "index": 0,
+                    "name": "",
+                    "parameters": [ "-", "-", "-", "-", "-", "-", "-", "-" ],
+                    "buttons": [ "-", "-", "-", "-", "-", "-", "-", "-" ]
+                }
+            },
             "inherited_shortname": 1
         },
         "autosave": 0,
