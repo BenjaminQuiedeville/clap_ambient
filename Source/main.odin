@@ -132,6 +132,12 @@ PI_4f32 :: f32(math.PI / 4)
 dbtoa :: #force_inline proc(x: f32) -> f32 { return math.pow(10.0, x * 0.05) }
 atodb :: #force_inline proc(x: f32) -> f32 { return 20.0 * math.log10(x) }
 
+apply_gain_linear :: #force_inline proc(buffer: []f32, gain: f32) {
+    for index in 0..<len(buffer) {
+        buffer[index] *= gain
+    }
+}
+
 ms_to_samples_frac :: #force_inline proc(x, samplerate: f32) -> f32 { return x * 0.001*samplerate }
 ms_to_samples :: #force_inline proc(x, samplerate: f32) -> int { return int(x * 0.001*samplerate) }
 
@@ -298,6 +304,7 @@ Reverb :: struct {
         delay_lines: [4]DelayLine,
         delay_frac: [4]f32,
         lp_filters: [4]Biquad,
+        lp_state: [4][2]f32,
         feedback: f32,
     },
     
@@ -310,16 +317,23 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     
     //early stages
     nsamples := len(bufferL)
-    
+    early_gain := dbtoa(-6)
+    late_gain := dbtoa(-6)
+        
     for index in 0..<nsamples {
         reverb.input_buffer[index] = (bufferL[index] + bufferR[index])*0.5
     }
 
-    
-    for allpass_index in 0..<len(reverb.early.allpasses) {
+    // for allpass_index in 0..<len(reverb.early.allpasses) {
+    for allpass_index in 0..<3 {
         allpass_process_buffer(&reverb.early.allpasses[allpass_index], reverb.input_buffer)
     }
-    
+
+    for index in 0..<nsamples {
+        bufferL[index] += reverb.input_buffer[index] * early_gain
+        bufferR[index] += reverb.input_buffer[index] * early_gain
+    }
+
     { //late  
     // screams SIMD    
         fdn_order : int : 4
@@ -340,8 +354,8 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
                                                                          read_index_frac)
             }
             
-            bufferL[index] = math.lerp(bufferL[index], delay_outputs[2], reverb.mix)
-            bufferR[index] = math.lerp(bufferR[index], delay_outputs[3], reverb.mix)
+            bufferL[index] += delay_outputs[2] * late_gain
+            bufferR[index] += delay_outputs[3] * late_gain
                         
             for channel in 0..<fdn_order {
                 for matrix_index in 0..<fdn_order {
@@ -351,14 +365,20 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
             }            
             
             for channel in 0..<fdn_order {
-                delay_in := biquad_process_sampleL(&reverb.late.lp_filters[channel], 
-                                                                 mixing_outputs[channel])
+                delay_in := biquad_process_sample(reverb.late.lp_filters[channel], reverb.late.lp_state[channel][:],
+                                                                mixing_outputs[channel])
             
-                delay_line_push_sample(&reverb.late.delay_lines[channel], 
-                                       delay_in * reverb.late.feedback + fdn_in_sample)
+                delay_in *= reverb.late.feedback
+                if channel == 0 {
+                    delay_in += fdn_in_sample
+                }
+                delay_line_push_sample(&reverb.late.delay_lines[channel], delay_in)
             }
         }
-    }    
+    }
+    
+    apply_gain_linear(bufferL, 0.5)    
+    apply_gain_linear(bufferR, 0.5)    
 }
 
 ProgenitorReverb :: struct {}
@@ -371,6 +391,8 @@ Echo :: struct {
     feedback: RampedValue,
     mix: RampedValue,
     tone_filter: Biquad,
+    filter_stateL: [2]f32,
+    filter_stateR: [2]f32,
     lfo: LFO,
     mod_amount: f32
 }
@@ -401,8 +423,8 @@ echo_process :: proc(echo: ^Echo, bufferL: []f32, bufferR: []f32) {
         feedback_sampleL := in_sampleL + output_sampleL * echo.feedback.value_buffer[index]
         feedback_sampleR := in_sampleR + output_sampleR * echo.feedback.value_buffer[index]
     
-        feedback_sampleL = biquad_process_sampleL(&echo.tone_filter, feedback_sampleL)
-        feedback_sampleR = biquad_process_sampleL(&echo.tone_filter, feedback_sampleR)
+        feedback_sampleL = biquad_process_sample(echo.tone_filter, echo.filter_stateL[:], feedback_sampleL)
+        feedback_sampleR = biquad_process_sample(echo.tone_filter, echo.filter_stateR[:], feedback_sampleR)
     
         delay_line_push_sample(&echo.delay_lineL, feedback_sampleL)
         delay_line_push_sample(&echo.delay_lineR, feedback_sampleR)
@@ -452,15 +474,6 @@ Biquad :: struct {
     b0, b1, b2: f32,
     a1, a2: f32, 
     gain: f32,
-    w1L, w2L: f32,
-    w1R, w2R: f32,
-}
-
-biquad_reset :: proc(f: ^Biquad) {
-    f.w1L = 0.0
-    f.w2L = 0.0
-    f.w1R = 0.0
-    f.w2R = 0.0
 }
 
 make_lowpass1 :: proc(f: ^Biquad, freq: f32, samplerate: f32) {
@@ -617,36 +630,20 @@ make_peak :: proc(f: ^Biquad, freq: f32, Q: f32, gain_dB: f32, samplerate: f32) 
     f.a2 = -(1.0 - alpha / A) * a0inv
 }
 
-biquad_process_sampleL :: #force_inline proc(f: ^Biquad, sample: f32) -> f32 {
-    w := sample + f.a1*f.w1L + f.a2*f.w2L
-    out_sample := f.b0*w + f.b1*f.w1L + f.b2*f.w2L
+biquad_process_sample :: #force_inline proc(f: Biquad, state: []f32, sample: f32) -> f32 {
+    w := sample + f.a1*state[0] + f.a2*state[1]
+    out_sample := f.b0*w + f.b1*state[0] + f.b2*state[1]
     
-    f.w2L = f.w1L
-    f.w1L = w
+    state[1] = state[0]
+    state[0] = w
     return out_sample
 }
 
-biquad_process_sampleR :: #force_inline proc(f: ^Biquad, sample: f32) -> f32 {    
-    w := sample + f.a1*f.w1R + f.a2*f.w2R
-    out_sample := f.b0*w + f.b1*f.w1R + f.b2*f.w2R
-    
-    f.w2R = f.w1R
-    f.w1R = w
-    return out_sample
-}
 
-biquad_process :: proc(f: ^Biquad, bufferL: []f32, bufferR: []f32) {
-
-    assert(bufferL != nil)
+biquad_process :: proc(f: Biquad, state: []f32, buffer: []f32) {
     
-    for index in 0..<len(bufferL) {
-        bufferL[index] = biquad_process_sampleL(f, bufferL[index])
-    }
-    
-    if bufferR != nil {
-        for index in 0..<len(bufferR) {
-            bufferR[index] = biquad_process_sampleR(f, bufferR[index])
-        }
+    for index in 0..<len(buffer) {
+        buffer[index] = biquad_process_sample(f, state, buffer[index])
     }
 }
 
@@ -672,9 +669,9 @@ allpass_process_sample :: #force_inline proc(ap: ^AllpassDelay, in_sample: f32) 
     read_position := f32(ap.delay_line.write_index) - ap.delay_frac
     
     delay_sample := delay_line_read_sample_lagrange(ap.delay_line, read_position)
-    out_sample := delay_sample - in_sample*ap.gain
+    out_sample := delay_sample + in_sample*ap.gain
     
-    feedback_sample := in_sample + delay_sample * ap.gain
+    feedback_sample := in_sample - delay_sample * ap.gain
     delay_line_push_sample(&ap.delay_line, feedback_sample)
     
     return out_sample
@@ -960,7 +957,6 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         lfo_init(&echo.lfo, 0.5, plugin.samplerate, max_buffer_size, allocator)
         
         make_lowpass1(&echo.tone_filter, 10000.0, plugin.samplerate)
-        biquad_reset(&echo.tone_filter)
     }
     
     { // reverb
@@ -971,37 +967,36 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         ensure(error == nil)
         allocator := vmem.arena_allocator(&plugin.reverb_arena)
         
-        allpass_max_delay := ms_to_samples(300.0, plugin.samplerate)
+        early_allpass_max_delay := ms_to_samples(200.0, plugin.samplerate)
         
-        early_times := [4]f32{4.77, 3.59, 12.73, 9.3}
-        early_gains := [4]f32{0.7, 0.7, 0.6, 0.8}
+        // early_times := [4]f32{20.638905, 41.27781, 82.55562, 165.11124}
+        early_times := [4]f32{6.57, 18.79, 34.26, 163.26}
+        early_gains := [4]f32{0.5, 0.7, 0.6, 0.85}
                 
         for index in 0..<len(reverb.early.allpasses) {
             filter := &reverb.early.allpasses[index]
-            filter.delay_line.buffer = make([]f32, allpass_max_delay, allocator)            
+            filter.delay_line.buffer = make([]f32, early_allpass_max_delay, allocator)
             
             filter.delay_frac = ms_to_samples_frac(early_times[index], plugin.samplerate)
             filter.gain = early_gains[index]
         }
         
         fdn_max_delay := int(300.0 * 0.001 * samplerate)
-        fdn_delays_ms := [4]f32{146.8, 152.13, 185.63, 168.18}
+        fdn_delays_ms := [4]f32{6.545286, 22.525751, 66.72586, 81.037285}
         reverb.late.feedback = 0.8
         
         for channel in 0..<len(reverb.late.delay_lines) {
             reverb.late.delay_lines[channel].buffer = make([]f32, fdn_max_delay, allocator)
-            
             reverb.late.delay_frac[channel] = ms_to_samples_frac(fdn_delays_ms[channel], plugin.samplerate)
             
-            make_lowpass1(&reverb.late.lp_filters[channel], 10000.0, plugin.samplerate)
+            make_lowpass1(&reverb.late.lp_filters[channel], 5000.0, plugin.samplerate)
         }
         
-        reverb.input_buffer = make([]f32, max_buffer_size, allocator)        
+        mem.zero(&reverb.late.lp_state, len(&reverb.late.lp_state) * len(&reverb.late.lp_state[0]) * size_of(f32))
+        reverb.input_buffer = make([]f32, max_buffer_size, allocator)
         reverb.mix = plugin.audio_param_values[.ReverbMix]
     }
-    
-    // init et alloue tous ce qui a besoin de la samplerate ou de la block size
-    
+        
     return true 
 }
 
@@ -1190,7 +1185,7 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
             outputR : []f32 = process.audio_outputs[0].data32[1][current_frame_index:current_frame_index + nsamples]
             
             
-            echo_process(&plugin.echo, inputL, inputR)
+            // echo_process(&plugin.echo, inputL, inputR)
             
             reverb_process(&plugin.reverb, inputL, inputR)
             
