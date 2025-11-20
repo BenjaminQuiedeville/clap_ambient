@@ -3,19 +3,20 @@ package clap_ambient
 import "base:runtime"
 import intrin "base:intrinsics"
 import "core:math"
-import "core:sys/windows"
+import win32 "core:sys/windows"
 import "core:mem"
 import vmem "core:mem/virtual"
 import "core:slice"
 import "core:fmt"
 import "core:strings"
 import "core:strconv"
-import "vendor:directx/d3d11"
-import "vendor:directx/dxgi"
+// import "vendor:directx/d3d11"
+// import "vendor:directx/dxgi"
+import opengl "vendor:OpenGL"
 
 import imgui "../odin-imgui"
-import "../odin-imgui/imgui_impl_win32"
-import "../odin-imgui/imgui_impl_dx11"
+import imgui_win32 "../odin-imgui/imgui_impl_win32"
+import imgui_opengl "../odin-imgui/imgui_impl_opengl3"
 import clap  "../clap-odin"
 import clap_ext "../clap-odin/ext"
 
@@ -162,6 +163,7 @@ ramped_value_init :: proc(value: ^RampedValue, init_value: f32, buffer_size: u32
     value.step_height = 0.0
     value.current_value = init_value
     value.value_buffer = make([]f32, buffer_size, allocator)
+    slice.zero(value.value_buffer)
 }
 
 RAMP_TIME_MS : f32 : 100.0
@@ -305,6 +307,7 @@ Reverb :: struct {
         delay_frac: [4]f32,
         lp_filters: [4]Biquad,
         lp_state: [4][2]f32,
+        lfos: [4]LFO,
         feedback: f32,
     },
     
@@ -316,7 +319,7 @@ Reverb :: struct {
 reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     
     //early stages
-    nsamples := len(bufferL)
+    nsamples := u32(len(bufferL))
     early_gain := dbtoa(-6)
     late_gain := dbtoa(-6)
         
@@ -341,6 +344,12 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
                                      {1, -1,  1, -1},
                                      {1,  1, -1, -1},
                                      {1, -1, -1,  1}, }
+
+
+        mod_amount : f32 = 1.0
+        for channel in 0..<fdn_order {
+            lfo_fill_buffers(&reverb.late.lfos[channel], nsamples)
+        }
     
         for index in 0..<nsamples{
             delay_outputs: [fdn_order]f32
@@ -349,14 +358,14 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
             fdn_in_sample := reverb.input_buffer[index]
             
             for channel in 0..<fdn_order {
-                read_index_frac := f32(reverb.late.delay_lines[channel].write_index) - reverb.late.delay_frac[channel]
+                read_index_frac := f32(reverb.late.delay_lines[channel].write_index) - reverb.late.delay_frac[channel] + reverb.late.lfos[channel].sin_buffer[index] * mod_amount
                 delay_outputs[channel] = delay_line_read_sample_lagrange(reverb.late.delay_lines[channel], 
                                                                          read_index_frac)
             }
             
             bufferL[index] += delay_outputs[2] * late_gain
             bufferR[index] += delay_outputs[3] * late_gain
-                        
+            
             for channel in 0..<fdn_order {
                 for matrix_index in 0..<fdn_order {
                     mixing_outputs[channel] += delay_outputs[channel]*mixing_matrix[channel][matrix_index]
@@ -444,10 +453,11 @@ LFO :: struct {
 
 lfo_init :: proc(lfo: ^LFO, freq: f32, samplerate: f32, buffer_size: u32, allocator: runtime.Allocator) {
 
-    lfo.cos_value = 0.5
-    
+    lfo.cos_value = 0.5    
     lfo.cos_buffer = make([]f32, buffer_size, allocator)
     lfo.sin_buffer = make([]f32, buffer_size, allocator)
+    slice.zero(lfo.cos_buffer)
+    slice.zero(lfo.sin_buffer)
 
     lfo_set_frequency(lfo, freq, samplerate)
 }
@@ -466,8 +476,11 @@ lfo_step :: #force_inline proc(lfo: ^LFO, index: u32) {
     lfo.cos_value -= lfo.param * lfo.sin_value
     lfo.sin_value += lfo.param * lfo.cos_value
     
-    lfo.cos_buffer[index] = lfo.cos_value
-    lfo.sin_buffer[index] = lfo.sin_value
+    lfo.cos_value = clamp(lfo.cos_value, -0.5, 0.5)
+    lfo.sin_value = clamp(lfo.sin_value, -0.5, 0.5)
+    
+    lfo.cos_buffer[index] =  2.0 * lfo.cos_value
+    lfo.sin_buffer[index] =  2.0 * lfo.sin_value
 }
 
 Biquad :: struct {
@@ -694,7 +707,12 @@ Looper :: struct {}
 
 GranularDelay :: struct {}
 
-GUI :: struct {}
+GUI :: struct {
+    window_class: win32.WNDCLASSW,
+    window: win32.HWND,
+    width, height: int
+    
+}
 
 PluginData :: struct {
     plugin: clap.Plugin,
@@ -861,20 +879,93 @@ state_extension := clap_ext.Plugin_State {
 }
 
 
-is_gui_api_supported :: proc "c" (_plugin: ^clap.Plugin, api: cstring, id_floating: bool) -> bool { return false }
-gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floating: bool) -> bool { return false }
-create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool { return false }
-destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {}
+is_gui_api_supported :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool { 
+    return string(api) == clap_ext.WINDOW_API_WIN32 && !is_floating
+}
+
+gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floating: ^bool) -> bool { 
+    api^ = clap_ext.WINDOW_API_WIN32
+    is_floating^ = false
+    return true 
+}
+
+window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wParam: win32.WPARAM, lParam: win32.LPARAM) -> win32.LRESULT { 
+    return 0
+}
+
+
+create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool {
+    if !is_gui_api_supported(_plugin, api, is_floating) { return false }
+    
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    gui := &plugin.gui
+    
+    mem.zero(&gui.window_class, size_of(gui.window_class))
+    gui.window_class.lpfnWndProc = window_procedure
+    gui.window_class.cbWndExtra = size_of(^PluginData)
+    gui.window_class.lpszClassName = transmute([^]u16)plugin_descriptor.id
+    gui.window_class.hCursor = win32.LoadCursorA(nil, win32.IDC_ARROW)
+    gui.window_class.style = win32.CS_OWNDC | win32.CS_DBLCLKS
+    win32.RegisterClassW(&gui.window_class)
+    
+    gui_width :: 600
+    gui_height :: 400
+    gui.window = win32.CreateWindowW(transmute([^]u16)plugin_descriptor.id, 
+                                    transmute([^]u16)plugin_descriptor.name, 
+                                    win32.WS_CHILDWINDOW | win32.WS_CLIPSIBLINGS, 
+                                    win32.CW_USEDEFAULT, 0, 
+                                    gui_width, gui_height,
+                                    win32.GetDesktopWindow(),
+                                    nil, gui.window_class.hInstance, nil)
+                                       
+    win32.SetWindowLongPtrW(gui.window, 0, transmute(win32.LONG_PTR)plugin)
+    
+    gui.width = gui_width
+    gui.height = gui_height             
+    return true
+}
+
+destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    
+    win32.DestroyWindow(plugin.gui.window)
+    plugin.gui.window = nil
+    win32.UnregisterClassW(transmute([^]u16)plugin_descriptor.id, nil)
+}
+
 set_gui_scale :: proc "c" (_plugin: ^clap.Plugin, scale: f64) -> bool { return false }
-get_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool { return false }
+get_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool { 
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    
+    width^ = u32(plugin.gui.width)
+    height^ = u32(plugin.gui.height)
+    return true
+}
+
 can_gui_resize :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
 get_gui_resize_hints :: proc "c" (_plugin: ^clap.Plugin, hints: ^clap_ext.Gui_Resize_Hints) -> bool { return false }
-adjust_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool { return false }
-set_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool { return false }
-set_gui_parent :: proc "c" (_plugin: ^clap.Plugin, window: ^clap_ext.Window) -> bool { return false }
+adjust_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool { return get_gui_size(_plugin, width, height) }
+set_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool { return true }
+
+set_gui_parent :: proc "c" (_plugin: ^clap.Plugin, parent_window: ^clap_ext.Window) -> bool {
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    
+    win32.SetParent(plugin.gui.window, transmute(win32.HWND)parent_window.handle)
+    return true
+}
+
 set_gui_transient :: proc "c" (_plugin: ^clap.Plugin, window: ^clap_ext.Window) -> bool { return false }
 suggest_gui_title :: proc "c" (_plugin: ^clap.Plugin, title: cstring) {}
-show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
+
+show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { 
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    gui := &plugin.gui
+    
+    // montrer le gui
+
+    return false 
+}
+
 hide_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
 
 @(rodata)
@@ -928,11 +1019,11 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
     plugin.min_buffer_size = min_buffer_size
     plugin.max_buffer_size = max_buffer_size
     
-    {
-        error := vmem.arena_init_growing(&plugin.main_arena, 4 * mem.Megabyte)
-        ensure(error == nil)
-        allocator := vmem.arena_allocator(&plugin.main_arena)
-    }
+    // {
+    //     error := vmem.arena_init_growing(&plugin.main_arena, 4 * mem.Megabyte)
+    //     ensure(error == nil)
+    //     allocator := vmem.arena_allocator(&plugin.main_arena)
+    // }
     
     {
         error := vmem.arena_init_growing(&plugin.echo_arena, 4 * mem.Megabyte)
@@ -944,6 +1035,8 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         buffer_size := u32(parameter_infos[ParamIDs.EchoTime].max * 0.001 * plugin.samplerate)
         echo.delay_lineL.buffer = make([]f32, buffer_size, allocator)
         echo.delay_lineR.buffer = make([]f32, buffer_size, allocator)
+        slice.zero(echo.delay_lineL.buffer)
+        slice.zero(echo.delay_lineR.buffer)
         
         init_delay_frac := ms_to_samples_frac(parameter_infos[.EchoTime].default_value, plugin.samplerate)
 
@@ -976,6 +1069,7 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         for index in 0..<len(reverb.early.allpasses) {
             filter := &reverb.early.allpasses[index]
             filter.delay_line.buffer = make([]f32, early_allpass_max_delay, allocator)
+            slice.zero(filter.delay_line.buffer)
             
             filter.delay_frac = ms_to_samples_frac(early_times[index], plugin.samplerate)
             filter.gain = early_gains[index]
@@ -985,8 +1079,13 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         fdn_delays_ms := [4]f32{6.545286, 22.525751, 66.72586, 81.037285}
         reverb.late.feedback = 0.8
         
+        for channel in 0..<len(reverb.late.lfos) {
+            lfo_init(&reverb.late.lfos[channel], 0.5, plugin.samplerate, max_buffer_size, allocator)        
+        }
+        
         for channel in 0..<len(reverb.late.delay_lines) {
             reverb.late.delay_lines[channel].buffer = make([]f32, fdn_max_delay, allocator)
+            slice.zero(reverb.late.delay_lines[channel].buffer)
             reverb.late.delay_frac[channel] = ms_to_samples_frac(fdn_delays_ms[channel], plugin.samplerate)
             
             make_lowpass1(&reverb.late.lp_filters[channel], 5000.0, plugin.samplerate)
@@ -994,6 +1093,7 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         
         mem.zero(&reverb.late.lp_state, len(&reverb.late.lp_state) * len(&reverb.late.lp_state[0]) * size_of(f32))
         reverb.input_buffer = make([]f32, max_buffer_size, allocator)
+        slice.zero(reverb.input_buffer)
         reverb.mix = plugin.audio_param_values[.ReverbMix]
     }
         
