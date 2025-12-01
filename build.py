@@ -16,8 +16,8 @@ def run(command):
 
 
 def build_plugin_code(debug: bool):
-    # command = f"odin build source -out:build/plugin_code.lib -debug -pdb-name:build/plugin_code.pdb -build-mode:lib -vet-semicolon"
-    command = f"odin build source -out:build/odin_code/plugin_code.obj -debug -build-mode:object -vet-semicolon"
+    command = f"odin build source -out:build/plugin_code.lib -debug -pdb-name:build/plugin_code.pdb -build-mode:lib -vet-semicolon"
+    # command = f"odin build source -out:build/odin_code/plugin_code.obj -debug -build-mode:object -vet-semicolon"
     run(command)
     return
 
@@ -235,8 +235,8 @@ def final_build(debug: bool):
         "/ERRORREPORT:QUEUE /INCREMENTAL /NOLOGO",
         "/MANIFEST /MANIFESTUAC:\"level='asInvoker' uiAccess='false'\" /manifest:embed /DEBUG",
         "/SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT",
-        "/MACHINE:X64  /machine:x64 /DLL",
-
+        "/MACHINE:X64  /machine:x64 /DLL", 
+        "/NODEFAULTLIB:MSVCRT /NODEFAULTLIB:LIBCMT",
     ])
 
     libs = " ".join([
@@ -245,11 +245,15 @@ def final_build(debug: bool):
         "opengl32.lib", "kernel32.lib", "user32.lib", "gdi32.lib",
         "winspool.lib", "shell32.lib", "ole32.lib", "oleaut32.lib",
         "uuid.lib", "comdlg32.lib", "advapi32.lib",
+        "odin-imgui/imgui_windows_x64.lib",
+        # "source/imgui_code.lib",
     ])
     
     object_files = " ".join([
         "build/clap_ambient_vst3/Debug/*.obj",
-        "build/odin_code/*.obj",
+        "build/plugin_code.lib",
+        # "build/odin_code/*.obj",
+        # "source/imgui_code.obj",
     ])
 
     Print("Final Linking")

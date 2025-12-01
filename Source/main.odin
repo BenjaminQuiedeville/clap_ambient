@@ -710,6 +710,9 @@ GranularDelay :: struct {}
 GUI :: struct {
     window_class: win32.WNDCLASSW,
     window: win32.HWND,
+    imgui_context: ^imgui.Context,
+    opengl_context: win32.HGLRC,
+    device_context: win32.HDC,
     width, height: int
     
 }
@@ -827,7 +830,7 @@ param_convert_text_to_value :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Cl
     context = runtime.default_context()
 
     in_string := string(param_value_text)
-    out_value^ = strconv.atof(in_string)
+    out_value^, _ = strconv.parse_f64(in_string)
     return false 
 }
 
@@ -903,15 +906,15 @@ create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) 
     mem.zero(&gui.window_class, size_of(gui.window_class))
     gui.window_class.lpfnWndProc = window_procedure
     gui.window_class.cbWndExtra = size_of(^PluginData)
-    gui.window_class.lpszClassName = transmute([^]u16)plugin_descriptor.id
+    gui.window_class.lpszClassName = transmute(cstring16)plugin_descriptor.id
     gui.window_class.hCursor = win32.LoadCursorA(nil, win32.IDC_ARROW)
     gui.window_class.style = win32.CS_OWNDC | win32.CS_DBLCLKS
     win32.RegisterClassW(&gui.window_class)
     
     gui_width :: 600
     gui_height :: 400
-    gui.window = win32.CreateWindowW(transmute([^]u16)plugin_descriptor.id, 
-                                    transmute([^]u16)plugin_descriptor.name, 
+    gui.window = win32.CreateWindowW(transmute(cstring16)plugin_descriptor.id, 
+                                    transmute(cstring16)plugin_descriptor.name, 
                                     win32.WS_CHILDWINDOW | win32.WS_CLIPSIBLINGS, 
                                     win32.CW_USEDEFAULT, 0, 
                                     gui_width, gui_height,
@@ -930,7 +933,7 @@ destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {
     
     win32.DestroyWindow(plugin.gui.window)
     plugin.gui.window = nil
-    win32.UnregisterClassW(transmute([^]u16)plugin_descriptor.id, nil)
+    win32.UnregisterClassW(transmute(cstring16)plugin_descriptor.id, nil)
 }
 
 set_gui_scale :: proc "c" (_plugin: ^clap.Plugin, scale: f64) -> bool { return false }
@@ -958,12 +961,67 @@ set_gui_transient :: proc "c" (_plugin: ^clap.Plugin, window: ^clap_ext.Window) 
 suggest_gui_title :: proc "c" (_plugin: ^clap.Plugin, title: cstring) {}
 
 show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { 
+    context = runtime.default_context()
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
-    
-    // montrer le gui
 
-    return false 
+    win32.ShowWindow(gui.window, win32.SW_SHOW)
+    win32.SetFocus(gui.window)
+    
+    done := false
+    
+    create_device_GL: {
+        device_context := win32.GetDC(gui.window)
+        pfd: win32.PIXELFORMATDESCRIPTOR
+        pfd.nSize = size_of(pfd)
+        pfd.nVersion = 1
+        pfd.dwFlags = win32.PFD_DRAW_TO_WINDOW | win32.PFD_SUPPORT_OPENGL | win32.PFD_DOUBLEBUFFER
+        pfd.iPixelType = win32.PFD_TYPE_RGBA
+        pfd.cColorBits = 32
+    
+        pf := win32.ChoosePixelFormat(device_context, &pfd)
+        if pf == 0 {
+            done = false
+            break create_device_GL
+        }
+        if win32.SetPixelFormat(device_context, pf, &pfd) == win32.FALSE {
+            done = false
+            break create_device_GL
+        }
+        win32.ReleaseDC(gui.window, device_context)
+    
+        gui.device_context = win32.GetDC(gui.window)
+        if gui.opengl_context == nil {
+            gui.opengl_context = win32.wglCreateContext(gui.device_context)
+        }
+        done = true
+    }
+
+    if !done {
+        win32.wglMakeCurrent(nil, nil)
+        win32.ReleaseDC(gui.window, gui.device_context)
+        win32.DestroyWindow(gui.window)
+        win32.UnregisterClassW(transmute(cstring16)plugin_descriptor.id, nil)
+        return false
+    }
+    
+    win32.wglMakeCurrent(gui.device_context, gui.opengl_context)
+    win32.UpdateWindow(gui.window)
+    
+    imgui.CHECKVERSION()
+    
+    imgui.SetCurrentContext(nil)
+    gui.imgui_context = imgui.CreateContext()
+    imgui.SetCurrentContext(gui.imgui_context)
+    
+    imgui.StyleColorsDark()
+    
+    imgui_win32.InitForOpenGL(gui.window)
+    imgui_opengl.Init()
+
+    win32.SetTimer(gui.window, 1, 30, nil)
+    
+    return true
 }
 
 hide_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
