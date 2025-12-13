@@ -55,7 +55,7 @@ ParamInfo :: struct {
     min: f32,
     max: f32,
     default_value: f32,
-    imgui_flags: u32,
+    imgui_flags: imgui.SliderFlags,
     clap_param_flags: clap_ext.Param_Info_Flag,
 }
 
@@ -63,66 +63,74 @@ ParamInfo :: struct {
 parameter_infos := [ParamIDs]ParamInfo {
     .InGain = {
         name = "Input Gain (dB)", min = -60.0, max = 6.0, default_value = 0.0,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .OutGain = {
         name = "Output Gain (dB)", min = -60.0, max = 6.0, default_value = 0.0,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
 
     .EchoTime = {
         name = "Delay Time", min = 1.0, max = 2000.0, default_value = 300.0,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE
     },
     .EchoFeedback = {
         name = "Feedback", min = 0.0, max = 1.0, default_value = 0.5,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE
     },
     .EchoTone = {
-        name = "Echo tone", min = 0.0, max = 20000.0, default_value = 20000.0,
-        imgui_flags = 0, // @TODO logarithmic
+        name = "Echo tone", min = 500.0, max = 20000.0, default_value = 20000.0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange, .Logarithmic}, 
         clap_param_flags = .AUTOMATABLE,
     },
     .EchoModFreq = {
         name = "Echo mod freq", min = 0.0, max = 10.0, default_value = 1.0,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .EchoModAmount = {
         name = "Echo mod amount", min = 0.0, max = 1.0, default_value = 0.0,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .EchoMix = {
         name = "Mix", min = 0.0, max = 1.0, default_value = 0.0,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE
     },
 
     .ReverbDecay = {
         name = "Reverb decay", min = 0.0, max = 1.0, default_value = 0.5,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,     
     },
     .ReverbSize = {
         name = "Reverb size", min = 0.0, max = 1.0, default_value = 0.5,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
-    .ReverbEarlyDiffusion = {},
-    .ReverbLateDiffusion = {},
+    .ReverbEarlyDiffusion = {
+        name = "Reverb Early Diffusion", min = 0.0, max = 1.0, default_value = 0.5,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
+        clap_param_flags = .AUTOMATABLE,
+    },
+    .ReverbLateDiffusion = {
+        name = "Reverb Late Diffusion", min = 0.0, max = 1.0, default_value = 0.5,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
+        clap_param_flags = .AUTOMATABLE,
+    },
     .ReverbTone = {
-        name = "Reverb Tone", min = 0.0, max = 1.0, default_value = 1.0,
-        imgui_flags = 0,
+        name = "Reverb Tone", min = 200.0, max = 20000.0, default_value = 15000.0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange, .Logarithmic},
         clap_param_flags = .AUTOMATABLE,
     },
     .ReverbMix = {
         name = "Reverb mix", min = 0.0, max = 1.0, default_value = 0.5,
-        imgui_flags = 0,
+        imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
 }
@@ -713,8 +721,10 @@ GUI :: struct {
     imgui_context: ^imgui.Context,
     opengl_context: win32.HGLRC,
     device_context: win32.HDC,
-    width, height: int
+    width, height: int,
     
+    test_slider_value :f32,
+    test_slider_value2 :f32,
 }
 
 PluginData :: struct {
@@ -728,7 +738,7 @@ PluginData :: struct {
 
     main_param_values: [ParamIDs]f32,
     audio_param_values: [ParamIDs]f32,
-    
+    param_is_in_edit: [ParamIDs]bool, 
     main_to_audio_fifo: EventFIFO,
 
     main_arena: vmem.Arena,
@@ -882,6 +892,8 @@ state_extension := clap_ext.Plugin_State {
 }
 
 
+GImGui: ^imgui.Context
+
 is_gui_api_supported :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool { 
     return string(api) == clap_ext.WINDOW_API_WIN32 && !is_floating
 }
@@ -892,7 +904,116 @@ gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floa
     return true 
 }
 
-window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wParam: win32.WPARAM, lParam: win32.LPARAM) -> win32.LRESULT { 
+make_slider :: proc(plugin: ^PluginData, param_index: ParamIDs, format: string) {
+    
+    slider_has_changed := imgui.SliderFloat(strings.clone_to_cstring(parameter_infos[param_index].name),
+                                            &plugin.main_param_values[param_index],
+                                            parameter_infos[param_index].min,
+                                            parameter_infos[param_index].max,
+                                            strings.clone_to_cstring(format), parameter_infos[param_index].imgui_flags)
+                                            
+    if slider_has_changed {
+        
+        if !plugin.param_is_in_edit[param_index] {
+            plugin.param_is_in_edit[param_index] = true
+            
+            main_push_event_to_audio(plugin, param_index, .GUI_GESTURE_BEGIN, plugin.main_param_values[param_index])
+        }
+        
+        main_push_event_to_audio(plugin, param_index, .GUI_VALUE_CHANGE, plugin.main_param_values[param_index])
+    } else {
+        
+        if plugin.param_is_in_edit[param_index] {
+            plugin.param_is_in_edit[param_index] = false
+            
+            main_push_event_to_audio(plugin, param_index, .GUI_GESTURE_END, plugin.main_param_values[param_index])
+        }    
+    }
+}
+
+window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wParam: win32.WPARAM, lParam: win32.LPARAM) -> win32.LRESULT {
+    context = runtime.default_context()
+    plugin := transmute(^PluginData)win32.GetWindowLongPtrW(window, win32.GWLP_USERDATA)
+    
+    if plugin == nil {
+        return win32.DefWindowProcW(window, message, wParam, lParam)
+    }
+
+    gui := &plugin.gui
+    
+    imgui.SetCurrentContext(gui.imgui_context)
+    
+    if imgui_win32.WndProcHandler(window, message, wParam, lParam) != 0 {
+        return 1
+    }
+
+    switch message {
+        case win32.WM_TIMER: {
+            plugin_sync_audio_to_main(plugin)            
+            
+            // imgui.SetCurrentContext(gui.imgui_context)
+            result := win32.wglMakeCurrent(gui.device_context, gui.opengl_context)            
+            
+            imgui_opengl.NewFrame()
+            imgui_win32.NewFrame()
+            imgui.NewFrame()
+            
+            viewport := imgui.GetMainViewport()
+            imgui.SetNextWindowPos(viewport.WorkPos)
+            imgui.SetNextWindowSize(viewport.WorkSize)
+            
+            io := imgui.GetIO()
+                        
+            {
+                open: bool = true
+                imgui.Begin("clap ambient plugin", &open, imgui.WindowFlags_NoDecoration)
+
+                make_slider(plugin, .InGain, "%.2f")
+                make_slider(plugin, .OutGain, "%.2f")
+
+                imgui.SeparatorText("Echo")
+                make_slider(plugin, .EchoTime, "%.2f")
+                make_slider(plugin, .EchoFeedback, "%.2f")
+                make_slider(plugin, .EchoTone, "%.2f")
+                make_slider(plugin, .EchoModFreq, "%.2f")
+                make_slider(plugin, .EchoModAmount, "%.2f")
+                make_slider(plugin, .EchoMix, "%.2f")
+    
+                imgui.SeparatorText("Reverb")
+                make_slider(plugin, .ReverbDecay, "%.2f")
+                make_slider(plugin, .ReverbSize, "%.2f")
+                make_slider(plugin, .ReverbEarlyDiffusion, "%.2f")
+                make_slider(plugin, .ReverbLateDiffusion, "%.2f")
+                make_slider(plugin, .ReverbTone, "%.2f")
+                make_slider(plugin, .ReverbMix, "%.2f")
+
+                if imgui.Button("Clear all buffers") {
+                    // clear all buffers
+                }
+                
+                imgui.End()
+            }
+            
+            clear_color := imgui.Vec4 {0.45, 0.55, 0.6, 1.0}
+            imgui.Render()
+            opengl.Viewport(0, 0, i32(gui.width), i32(gui.height))
+            opengl.ClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w)
+            opengl.Clear(opengl.COLOR_BUFFER_BIT)
+            
+            imgui_opengl.RenderDrawData(imgui.GetDrawData())
+            
+            win32.SwapBuffers(gui.device_context)
+            
+            imgui.SetCurrentContext(nil)
+            win32.wglMakeCurrent(nil, nil)
+            return 0
+        }
+        
+        case: {
+            return win32.DefWindowProcW(window, message, wParam, lParam)
+        }
+    }
+
     return 0
 }
 
@@ -906,34 +1027,33 @@ create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) 
     mem.zero(&gui.window_class, size_of(gui.window_class))
     gui.window_class.lpfnWndProc = window_procedure
     gui.window_class.cbWndExtra = size_of(^PluginData)
-    gui.window_class.lpszClassName = transmute(cstring16)plugin_descriptor.id
+    gui.window_class.lpszClassName = PLUGIN_DESC_ID
     gui.window_class.hCursor = win32.LoadCursorA(nil, win32.IDC_ARROW)
     gui.window_class.style = win32.CS_OWNDC | win32.CS_DBLCLKS
     win32.RegisterClassW(&gui.window_class)
     
-    gui_width :: 600
-    gui_height :: 400
-    gui.window = win32.CreateWindowW(transmute(cstring16)plugin_descriptor.id, 
-                                    transmute(cstring16)plugin_descriptor.name, 
-                                    win32.WS_CHILDWINDOW | win32.WS_CLIPSIBLINGS, 
-                                    win32.CW_USEDEFAULT, 0, 
-                                    gui_width, gui_height,
+    gui.width = 600
+    gui.height = 400
+    gui.window = win32.CreateWindowW(gui.window_class.lpszClassName, 
+                                    PLUGIN_NAME, 
+                                    win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_CLIPSIBLINGS, 
+                                    win32.CW_USEDEFAULT, win32.CW_USEDEFAULT, 
+                                    i32(gui.width), i32(gui.height),
                                     win32.GetDesktopWindow(),
                                     nil, gui.window_class.hInstance, nil)
                                        
-    win32.SetWindowLongPtrW(gui.window, 0, transmute(win32.LONG_PTR)plugin)
-    
-    gui.width = gui_width
-    gui.height = gui_height             
+    win32.SetWindowLongPtrW(gui.window, win32.GWLP_USERDATA, transmute(win32.LONG_PTR)plugin)
     return true
 }
 
 destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {
     plugin := transmute(^PluginData)_plugin.plugin_data
     
+    plugin_hidden := hide_gui(_plugin)
+    
     win32.DestroyWindow(plugin.gui.window)
     plugin.gui.window = nil
-    win32.UnregisterClassW(transmute(cstring16)plugin_descriptor.id, nil)
+    win32.UnregisterClassW(PLUGIN_DESC_ID, nil)
 }
 
 set_gui_scale :: proc "c" (_plugin: ^clap.Plugin, scale: f64) -> bool { return false }
@@ -953,7 +1073,7 @@ set_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool { r
 set_gui_parent :: proc "c" (_plugin: ^clap.Plugin, parent_window: ^clap_ext.Window) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
     
-    win32.SetParent(plugin.gui.window, transmute(win32.HWND)parent_window.handle)
+    win32.SetParent(plugin.gui.window, transmute(win32.HWND)parent_window.handle.win32)
     return true
 }
 
@@ -968,8 +1088,8 @@ show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     win32.ShowWindow(gui.window, win32.SW_SHOW)
     win32.SetFocus(gui.window)
     
-    done := false
     
+    done := false
     create_device_GL: {
         device_context := win32.GetDC(gui.window)
         pfd: win32.PIXELFORMATDESCRIPTOR
@@ -978,12 +1098,13 @@ show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
         pfd.dwFlags = win32.PFD_DRAW_TO_WINDOW | win32.PFD_SUPPORT_OPENGL | win32.PFD_DOUBLEBUFFER
         pfd.iPixelType = win32.PFD_TYPE_RGBA
         pfd.cColorBits = 32
-    
+        
         pf := win32.ChoosePixelFormat(device_context, &pfd)
-        if pf == 0 {
+        if pf == 0{
             done = false
             break create_device_GL
         }
+
         if win32.SetPixelFormat(device_context, pf, &pfd) == win32.FALSE {
             done = false
             break create_device_GL
@@ -993,7 +1114,7 @@ show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
         gui.device_context = win32.GetDC(gui.window)
         if gui.opengl_context == nil {
             gui.opengl_context = win32.wglCreateContext(gui.device_context)
-        }
+        }    
         done = true
     }
 
@@ -1001,14 +1122,16 @@ show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
         win32.wglMakeCurrent(nil, nil)
         win32.ReleaseDC(gui.window, gui.device_context)
         win32.DestroyWindow(gui.window)
-        win32.UnregisterClassW(transmute(cstring16)plugin_descriptor.id, nil)
+        win32.UnregisterClassW(PLUGIN_DESC_ID, nil)
         return false
     }
     
-    win32.wglMakeCurrent(gui.device_context, gui.opengl_context)
-    win32.UpdateWindow(gui.window)
-    
+    result := win32.wglMakeCurrent(gui.device_context, gui.opengl_context)
+    result = win32.ShowWindow(gui.window, win32.SW_SHOW)
+    result = win32.UpdateWindow(gui.window)
+
     imgui.CHECKVERSION()
+    if GImGui != nil  { GImGui = nil }
     
     imgui.SetCurrentContext(nil)
     gui.imgui_context = imgui.CreateContext()
@@ -1016,15 +1139,44 @@ show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     
     imgui.StyleColorsDark()
     
-    imgui_win32.InitForOpenGL(gui.window)
-    imgui_opengl.Init()
+    is_init := imgui_win32.InitForOpenGL(gui.window)
+    is_init = imgui_opengl.Init()
+    
+    opengl.load_up_to(3, 2, win32.gl_set_proc_address)
 
     win32.SetTimer(gui.window, 1, 30, nil)
     
     return true
 }
 
-hide_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
+hide_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { 
+    context = runtime.default_context()
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    gui := &plugin.gui
+
+    win32.ShowWindow(gui.window, win32.SW_HIDE)
+    win32.SetFocus(gui.window)
+    
+    win32.wglMakeCurrent(gui.device_context, gui.opengl_context)
+    imgui.SetCurrentContext(gui.imgui_context)
+    
+    imgui_opengl.Shutdown()
+    imgui_win32.Shutdown()
+    imgui.DestroyContext()
+    gui.imgui_context = nil
+    imgui.SetCurrentContext(nil)
+    
+    win32.wglMakeCurrent(nil, nil)
+    win32.ReleaseDC(gui.window, gui.device_context)
+    
+    win32.wglDeleteContext(gui.opengl_context)
+    gui.opengl_context = nil
+    gui.device_context = nil
+    
+    win32.KillTimer(gui.window, 1)
+    
+    return true
+}
 
 @(rodata)
 gui_extension := clap_ext.Plugin_Gui {
@@ -1297,8 +1449,14 @@ sync_params_main_to_audio :: proc(plugin: ^PluginData, out_events: ^clap.Output_
     intrin.atomic_store(&plugin.main_to_audio_fifo.read_index, read_index)
 }
 
+plugin_sync_audio_to_main :: proc(plugin: ^PluginData) {
+    for param_id, _ in ParamIDs {
+        plugin.main_param_values[param_id] = plugin.audio_param_values[param_id]
+    }
+}
 
-plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> clap.Process_Status { 
+
+plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> clap.Process_Status {
     context = runtime.default_context()
     plugin := transmute(^PluginData)_plugin.plugin_data
     
@@ -1422,60 +1580,58 @@ plugin_factory := clap.Plugin_Factory {
 
 plugin_features: []cstring 
 
-lib_init :: proc "c" (path: cstring) -> bool {
-    context = runtime.default_context()
+PLUGIN_DESC_ID :: "hermes140.clap_ambient"
+PLUGIN_NAME    :: "Clap Ambient"
 
-    plugin_descriptor.clap_version = clap.CLAP_VERSION
-    plugin_descriptor.id           = "hermes140.clap_ambient"
-    plugin_descriptor.name         = "Clap Ambient"
-    plugin_descriptor.vendor       = "Hermes140"
-    plugin_descriptor.url          = ""
-    plugin_descriptor.manual_url   = ""
-    plugin_descriptor.support_url  = ""
-    plugin_descriptor.version      = "0.1"
-    plugin_descriptor.description  = ""
-
-    if slice.is_empty(plugin_features) {
-        plugin_features = make([]cstring, 6)
-    }
-    plugin_features[0] = clap.PLUGIN_FEATURE_AUDIO_EFFECT
-    plugin_features[1] = clap.PLUGIN_FEATURE_STEREO
-    plugin_features[2] = clap.PLUGIN_FEATURE_MULTI_EFFECTS
-    plugin_features[3] = clap.PLUGIN_FEATURE_REVERB
-    plugin_features[4] = clap.PLUGIN_FEATURE_DELAY
-    plugin_features[5] = nil
-
-    plugin_descriptor.features = raw_data(plugin_features)
-
-
-    clap_plugin.desc             = &plugin_descriptor
-    clap_plugin.init             = plugin_init
-    clap_plugin.destroy          = plugin_destroy
-    clap_plugin.activate         = plugin_activate
-    clap_plugin.deactivate       = plugin_deactivate
-    clap_plugin.start_processing = plugin_start_processing
-    clap_plugin.stop_processing  = plugin_stop_processing
-    clap_plugin.reset            = plugin_reset
-    clap_plugin.process          = plugin_process
-    clap_plugin.get_extension    = plugin_get_extension
-    clap_plugin.on_main_thread   = plugin_on_main_thread
-
-    return true
-}
-
-lib_deinit :: proc "c" () {
-    context = runtime.default_context()
-    delete(plugin_features)
-}
-
-lib_get_factory :: proc "c" (id: cstring) -> rawptr {
-    return id == clap.PLUGIN_FACTORY_ID ? &plugin_factory : nil
-}
-
-@(export)
+@(export, rodata)
 clap_entry := clap.Plugin_Entry {
     clap_version = clap.CLAP_VERSION,
-    init = lib_init,
-    deinit = lib_deinit,
-    get_factory = lib_get_factory,
+    init = proc "c" (path: cstring) -> bool {
+        context = runtime.default_context()
+    
+        plugin_descriptor.clap_version = clap.CLAP_VERSION
+        plugin_descriptor.id           = PLUGIN_DESC_ID
+        plugin_descriptor.name         = PLUGIN_NAME
+        plugin_descriptor.vendor       = "Hermes140"
+        plugin_descriptor.url          = ""
+        plugin_descriptor.manual_url   = ""
+        plugin_descriptor.support_url  = ""
+        plugin_descriptor.version      = "0.1"
+        plugin_descriptor.description  = ""
+    
+        if slice.is_empty(plugin_features) {
+            plugin_features = make([]cstring, 6)
+        }
+        plugin_features[0] = clap.PLUGIN_FEATURE_AUDIO_EFFECT
+        plugin_features[1] = clap.PLUGIN_FEATURE_STEREO
+        plugin_features[2] = clap.PLUGIN_FEATURE_MULTI_EFFECTS
+        plugin_features[3] = clap.PLUGIN_FEATURE_REVERB
+        plugin_features[4] = clap.PLUGIN_FEATURE_DELAY
+        plugin_features[5] = nil
+    
+        plugin_descriptor.features = raw_data(plugin_features)
+    
+    
+        clap_plugin.desc             = &plugin_descriptor
+        clap_plugin.init             = plugin_init
+        clap_plugin.destroy          = plugin_destroy
+        clap_plugin.activate         = plugin_activate
+        clap_plugin.deactivate       = plugin_deactivate
+        clap_plugin.start_processing = plugin_start_processing
+        clap_plugin.stop_processing  = plugin_stop_processing
+        clap_plugin.reset            = plugin_reset
+        clap_plugin.process          = plugin_process
+        clap_plugin.get_extension    = plugin_get_extension
+        clap_plugin.on_main_thread   = plugin_on_main_thread
+    
+        return true
+    },
+
+    deinit = proc "c" () {
+        context = runtime.default_context()
+        delete(plugin_features)
+    },
+    get_factory = proc "c" (id: cstring) -> rawptr {
+        return id == clap.PLUGIN_FACTORY_ID ? &plugin_factory : nil
+    },
 }
