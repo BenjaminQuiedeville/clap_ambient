@@ -2,29 +2,47 @@ import os
 import os.path
 import sys
 
+
+vst_sdk_dir = "../../libs/vst3sdk"
+
+common_cpp_flags = " "/join([
+    "/nologo /MP /W3 /WX- /diagnostics:column /EHsc",
+    "/fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20",
+    "/external:W3 /Gd /TP /errorReport:queue"
+])
+ 
+
 def Print(message): print(message, file = sys.stdout, flush = True)
 
 def run(command):
     Print(command)
     result = os.system(command)
-
     if result != 0:
         Print("Error during command execution, exiting")
         exit(-1)
-
     return
 
+def build_plugin_code(debug: bool, optim: bool, config: str):
+    
+    flags = "-build-mode:object -vet-semicolon"
+    if debug: flags += " -debug"
+    if optim: flags += " -o:speed"
 
-def build_plugin_code(debug: bool):
-    command = f"odin build source -out:build/odin_code/plugin_code.obj -debug -build-mode:object -vet-semicolon"
+    build_dir = f"build/{config}/odin_code"
+    if not os.path.exists(build_dir):
+        os.makedirs(build_dir)
+
+    command = f"odin build source -out:{build_dir}/plugin_code.obj {flags}"
     run(command)
     return
-
 
 def build_imgui(debug: bool):
     
     imgui_temp_dir = "odin-imgui/temp"
     build_dir = "build/imgui/Debug"
+
+    if not os.path.exists(build_dir):
+        os.makedirs(build_dir)
 
     sources = " ".join([
         f"{imgui_temp_dir}/imgui.cpp",
@@ -81,97 +99,108 @@ def build_clap(debug: bool):
     return
 
 
-def build_vstsdk(debug: bool):
+def build_vstsdk(debug: bool, optim: bool, config: str):
 
-    build_dir = "build/vstsdk/Debug"
+    build_dir = f"build/{config}/vstsdk"
     if not os.path.exists(build_dir):
         os.makedirs(build_dir)
+    else:
+        return
 
     includes = " ".join([
-        "/I../../libs/vst3sdk",
-        "/I../../libs/vst3sdk/public.sdk",
-        "/I../../libs/vst3sdk/pluginterfaces",
+        f"/I{vst_sdk_dir}",
+        f"/I{vst_sdk_dir}/public.sdk",
+        f"/I{vst_sdk_dir}/pluginterfaces",
     ])
 
     flags = " ".join([
-        "/c /Zi /nologo /MP /W3 /WX- /diagnostics:column /O2 /Ob2", #/Od /Ob0",
-        "/EHsc /MDd /GS /arch:AVX2", #/RTC1
+        "/nologo /MP /W3 /WX- /diagnostics:column /EHsc",
         "/fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20",
         "/external:W3 /Gd /TP /errorReport:queue",
     ])
+
+    if debug: flags += " /Zi"
+    if debug and not optim: flags += " /RTC1 /MDd"
+    if optim: flags += " /O2 /Ob2 /MD /arch:AVX2"
 
     defines = " ".join([
         "/D _MBCS",
         "/D WIN32",
         "/D _WINDOWS",
-        "/DDEVELOPMENT=1",
     ])
 
-    sdk_dir = "../../libs/vst3sdk/"
+    if debug: defines += " /DDEVELOPMENT"
+    if optim and not debug: defines += " /DRELEASE"
+
 
     sources = " ".join([
-        f"{sdk_dir}/base/source/baseiids.cpp",
-        f"{sdk_dir}/base/source/fbuffer.cpp",
-        f"{sdk_dir}/base/source/fdebug.cpp",
-        f"{sdk_dir}/base/source/fdynlib.cpp",
-        f"{sdk_dir}/base/source/fobject.cpp",
-        f"{sdk_dir}/base/source/fstreamer.cpp",
-        f"{sdk_dir}/base/source/fstring.cpp",
-        f"{sdk_dir}/base/source/timer.cpp",
-        f"{sdk_dir}/base/source/updatehandler.cpp" ,
-        f"{sdk_dir}/base/thread/source/fcondition.cpp",
-        f"{sdk_dir}/base/thread/source/flock.cpp",
-        f"{sdk_dir}/pluginterfaces/base/conststringtable.cpp",
-        f"{sdk_dir}/pluginterfaces/base/coreiids.cpp",
-        f"{sdk_dir}/pluginterfaces/base/funknown.cpp",
-        f"{sdk_dir}/pluginterfaces/base/ustring.cpp",
-        f"{sdk_dir}/public.sdk/source/common/commoniids.cpp",
-        f"{sdk_dir}/public.sdk/source/common/memorystream.cpp",
-        f"{sdk_dir}/public.sdk/source/common/openurl.cpp",
-        f"{sdk_dir}/public.sdk/source/common/pluginview.cpp",
-        f"{sdk_dir}/public.sdk/source/common/readfile.cpp",
-        f"{sdk_dir}/public.sdk/source/common/systemclipboard_linux.cpp",
-        f"{sdk_dir}/public.sdk/source/common/systemclipboard_win32.cpp",
-        f"{sdk_dir}/public.sdk/source/common/threadchecker_linux.cpp",
-        f"{sdk_dir}/public.sdk/source/common/threadchecker_win32.cpp",
-        f"{sdk_dir}/public.sdk/source/main/dllmain.cpp",
-        f"{sdk_dir}/public.sdk/source/main/pluginfactory.cpp",
-        f"{sdk_dir}/public.sdk/source/main/moduleinit.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/vstinitiids.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/vstnoteexpressiontypes.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/vstsinglecomponenteffect.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/vstaudioeffect.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/vstcomponent.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/vstcomponentbase.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/vstbus.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/vstparameters.cpp",
-        f"{sdk_dir}/public.sdk/source/vst/utility/stringconvert.cpp",
+        f"{vst_sdk_dir}/base/source/baseiids.cpp",
+        f"{vst_sdk_dir}/base/source/fbuffer.cpp",
+        f"{vst_sdk_dir}/base/source/fdebug.cpp",
+        f"{vst_sdk_dir}/base/source/fdynlib.cpp",
+        f"{vst_sdk_dir}/base/source/fobject.cpp",
+        f"{vst_sdk_dir}/base/source/fstreamer.cpp",
+        f"{vst_sdk_dir}/base/source/fstring.cpp",
+        f"{vst_sdk_dir}/base/source/timer.cpp",
+        f"{vst_sdk_dir}/base/source/updatehandler.cpp" ,
+        f"{vst_sdk_dir}/base/thread/source/fcondition.cpp",
+        f"{vst_sdk_dir}/base/thread/source/flock.cpp",
+        f"{vst_sdk_dir}/pluginterfaces/base/conststringtable.cpp",
+        f"{vst_sdk_dir}/pluginterfaces/base/coreiids.cpp",
+        f"{vst_sdk_dir}/pluginterfaces/base/funknown.cpp",
+        f"{vst_sdk_dir}/pluginterfaces/base/ustring.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/commoniids.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/memorystream.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/openurl.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/pluginview.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/readfile.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/systemclipboard_linux.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/systemclipboard_win32.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/threadchecker_linux.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/common/threadchecker_win32.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/main/dllmain.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/main/pluginfactory.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/main/moduleinit.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/vstinitiids.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/vstnoteexpressiontypes.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/vstsinglecomponenteffect.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/vstaudioeffect.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/vstcomponent.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/vstcomponentbase.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/vstbus.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/vstparameters.cpp",
+        f"{vst_sdk_dir}/public.sdk/source/vst/utility/stringconvert.cpp",
     ])
 
-    compile_command = f"cl {flags} {defines} {includes} {sources} /Fo:{build_dir}/ /Fd:{build_dir}/vstsdk.pdb"
-
-    link_command = f"Lib.exe /OUT:build/base-sdk-vst3.lib /NOLOGO /MACHINE:X64 /machine:x64 {build_dir}/*.obj"
+    compile_command = f"cl /c {flags} {defines} {includes} {sources} /Fo:{build_dir}/ /Fd:{build_dir}/vstsdk.pdb"
     Print("Compiling the vst3 sdk")
     run(compile_command)
+
+    link_command = f"Lib.exe /OUT:build/{config}/base-sdk-vst3.lib /NOLOGO /MACHINE:X64 {build_dir}/*.obj"
     Print("Linking the vst3 sdk -> base-sdk-vst3.lib")
     run(link_command)
+    
     Print("\n\n")
-
+    
     return
 
+def build_wrapper(debug: bool, optim: bool, config: str):
 
-def build_wrapper(debug: bool):
-
-    build_dir = "build/clap-wrapper/Debug"
+    build_dir = f"build/{config}/clap-wrapper"
     if not os.path.exists(build_dir):
         os.makedirs(build_dir)
+    else:
+        return
 
     flags = " ".join([
-        "/c /Zi /nologo /MP /W3 /WX- /diagnostics:column",
-        "/O2 /Ob2 /arch:AVX2 /fp:precise", #/Od /Ob0
-        "/EHsc /MDd /GS /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20", #/RTC1
+        "/c /nologo /MP /W3 /WX- /diagnostics:column /fp:precise",
+        "/EHsc /GS /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20",
         "/external:W3 /Gd /TP /errorReport:queue /utf-8 /Zc:__cplusplus /Zc:char8_t-",
     ])
+    
+    if debug: flags += " /Zi"
+    if debug and not optim: flags += " /RTC1 /MDd"
+    if optim: flags += " /O2 /Ob2 /MD /arch:AVX2"
 
     defines = " ".join([
         "/D _MBCS",
@@ -180,9 +209,11 @@ def build_wrapper(debug: bool):
         "/D WIN=1",
         "/D CLAP_WRAPPER_VERSION=\\\"0.12.1\\\"",
         "/D CLAP_SUPPORTS_ALL_NOTE_EXPRESSIONS=0",
-        "/D DEVELOPMENT=1",
         "/D CLAP_WRAPPER_BUILD_FOR_VST3=1",
     ])
+
+    if debug: defines += " /D DEVELOPMENT"
+    if optim and not debug: defines += " /D RELEASE"
 
     includes = " ".join([
         "/I../clap/include",
@@ -190,16 +221,15 @@ def build_wrapper(debug: bool):
         "/Iclap-wrapper/libs/fmt",
         "/Iclap-wrapper/libs/psl",
         "/Iclap-wrapper/src",
-        "/I../../libs/vst3sdk",
-        "/I../../libs/vst3sdk/public.sdk",
-        "/I../../libs/vst3sdk/pluginterfaces",
+        f"/I{vst_sdk_dir}",
+        f"/I{vst_sdk_dir}/public.sdk",
+        f"/I{vst_sdk_dir}/pluginterfaces",
     ])
 
     sources = " ".join([
         "clap-wrapper/src/clap_proxy.cpp",
         "clap-wrapper/src/detail/shared/sha1.cpp",
         "clap-wrapper/src/detail/clap/fsutil.cpp",
-
         "clap-wrapper/src/detail/os/windows.cpp",
         "clap-wrapper/src/wrapasvst3_entry.cpp",
         "clap-wrapper/src/wrapasvst3.cpp",
@@ -211,10 +241,10 @@ def build_wrapper(debug: bool):
 
     compile_command = f"cl.exe {flags} {defines} {includes} {sources} /Fo:{build_dir}/ /Fd:{build_dir}/clap-wrapper.pdb"
 
+    link_command = f"Lib.exe /OUT:build/{config}/clap-wrapper.lib /NOLOGO /MACHINE:X64 {build_dir}/*.obj"
+
     Print("Compiling the clap wrapper")
     run(compile_command)
-
-    link_command = f"Lib.exe /OUT:build/clap-wrapper.lib /NOLOGO /MACHINE:X64 /machine:x64 {build_dir}/*.obj"
 
     Print("Linking clap wrapper -> clap-wrapper.lib")
     run(link_command)
@@ -222,34 +252,39 @@ def build_wrapper(debug: bool):
 
     return
 
+def final_build(debug: bool, optim: bool, config: str):
 
-def final_build(debug: bool):
-
-    entry_point_build_dir = "build/clap_ambient_vst3/Debug"
+    entry_point_build_dir = f"build/{config}/entry_point"
     if not os.path.exists(entry_point_build_dir):
         os.makedirs(entry_point_build_dir)
 
     flags = " ".join([
-        "/c /Zi /nologo /MP /W3 /WX- /diagnostics:column /O2 /Ob2", # /Od /Ob0",
-        "/EHsc /MDd /GS /arch:AVX2 /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20", #/RTC1
+        "/c /nologo /MP /W3 /WX- /diagnostics:column",
+        "/EHsc /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20",
         "/external:W3 /Gd /TP /errorReport:queue /utf-8 /Zc:__cplusplus /Zc:char8_t-",
     ])
 
+    if debug: flags += " /Zi"
+    if not optim: flags += " /RTC1 /MDd"
+    if optim: flags += " /O2 /Ob2 /MD /arch:AVX2"
+
     defines = " ".join([
         "/D _WINDLL", "/D _MBCS", "/D WIN32","/D _WINDOWS", "/DWIN=1",
-        "/D DEVELOPMENT=1",
         "/D CLAP_WRAPPER_VERSION=\\\"0.12.1\\\"",
         "/D CLAP_WRAPPER_BUILD_FOR_VST3=1",
         "/D clap_ambient_vst3_EXPORTS",
         "/D CLAP_VST3_TUID_STRING=\\\"camb\\\"",
     ])
 
+    if debug: defines += " /DDEVELOPMENT"
+    if optim and not debug: defines += " /DRELEASE"
+
     includes = " ".join([
         "/I clap-wrapper/libs/psl",
         "/I../clap/include",
-        "/I../../libs/vst3sdk",
-        "/I../../libs/vst3sdk/public.sdk",
-        "/I../../libs/vst3sdk/pluginterfaces",
+        f"/I{vst_sdk_dir}",
+        f"/I{vst_sdk_dir}/public.sdk",
+        f"/I{vst_sdk_dir}/pluginterfaces",
         "/Iclap-wrapper/include",
         "/Iclap-wrapper/libs/fmt",
         "/Iclap-wrapper/src",
@@ -259,45 +294,42 @@ def final_build(debug: bool):
         "clap-wrapper/src/wrapasvst3_export_entry.cpp",
     ])
 
-    compile_command = f"cl.exe {flags} {defines} {includes} {sources} /Fo:{entry_point_build_dir}/ /Fd:{entry_point_build_dir}/vc143.pdb"
+    compile_command = f"cl.exe {flags} {defines} {includes} {sources} /Fo:{entry_point_build_dir}/ /Fd:{entry_point_build_dir}/entry_point.pdb"
 
     Print("\nEntry point compilation")
     run(compile_command)
 
 
     flags = " ".join([
-        "/ERRORREPORT:QUEUE /INCREMENTAL /NOLOGO",
-        "/MANIFEST /MANIFESTUAC:\"level='asInvoker' uiAccess='false'\" /manifest:embed /DEBUG",
+        "/ERRORREPORT:QUEUE /NOLOGO",
+        "/MANIFEST /MANIFESTUAC:\"level='asInvoker' uiAccess='false'\" /manifest:embed",
         "/SUBSYSTEM:CONSOLE",
         "/DYNAMICBASE:NO",
         "/MACHINE:X64 /DLL", 
-        # "/NODEFAULTLIB:MSVCRT /NODEFAULTLIB:LIBCMT",
     ])
 
+    if optim: flags += " /OPT:REF"
+
+    if debug: flags += " /DEBUG"
+
     libs = " ".join([
-        "build/clap-wrapper.lib",
-        "build/base-sdk-vst3.lib",
+        f"build/{config}/clap-wrapper.lib",
+        f"build/{config}/base-sdk-vst3.lib",
         "opengl32.lib", "kernel32.lib", "shell32.lib", "gdi32.lib", "user32.lib",
-        # "winspool.lib", 
-        "ole32.lib", 
-        "oleaut32.lib",
-        "uuid.lib", 
-        # "comdlg32.lib", 
-        # "advapi32.lib",
+        "ole32.lib", "oleaut32.lib", "uuid.lib", 
         "imgui.lib",
     ])
     
     object_files = " ".join([
         f"{entry_point_build_dir}/*.obj",
-        "build/odin_code/*.obj",
-        # "build/clap-wrapper/Debug/*.obj",
-        # "build/vstsdk/Debug/*.obj",
-        # "build/imgui/Debug/*.obj",
+        f"build/{config}/odin_code/*.obj",
     ])
 
+    final_build_dir = f"build/{config}"
+    out_name = f"{final_build_dir}/clap_ambient_{config}"
+    
     Print("\nFinal Linking")
-    # link_command = f"link.exe {flags} {libs} /OUT:build/clap_ambient.vst3 /ILK:build/clap_ambient.ilk /PDB:build/clap_ambient.pdb /IMPLIB:build/clap_ambient_vst3.lib {object_files}"
-    link_command = f"lld-link {flags} {object_files} {libs} /OUT:build/clap_ambient.vst3 /ILK:build/clap_ambient.ilk /PDB:build/clap_ambient.pdb /IMPLIB:build/clap_ambient_vst3.lib"
+    link_command = f"lld-link {flags} {object_files} {libs} /OUT:{out_name}.vst3 /ILK:{out_name}.ilk /PDB:{out_name}.pdb /IMPLIB:{out_name}.lib"
     run(link_command)
 
     return
@@ -312,25 +344,38 @@ def main():
         Print("Then call 'python build.py {debug|reldebug|release}' options to build the plugin")
         exit(0)
 
-    # if argv[1] == "debug":
-                
-    # elif argv[1] == "reldebug":
-    #     exit(0)
+    debug = False
+    optim = False
+    config = sys.argv[1]
+
+    if config == "debug":
+        debug = True
+    elif config == "reldebug":
+        debug = True
+        optim = True
         
-    # elif argv[1] == "release":
-    #     exit(0)
+    elif config == "release":
+        optim = True
+    
+    elif config == "clean":
+        os.system("rm -rf build")
+        exit(0)    
+    else:
+        Print("Wrong config name")
+        exit(0)
 
-    if not os.path.exists("build"):
-        os.mkdir("build")
 
-    build_plugin_code(True)
-    # build_vstsdk(True)
-    # build_wrapper(True)
-    # build_imgui(False)
-    final_build(True)
+    if not os.path.exists(f"build/{config}"):
+        os.makedirs(f"build/{config}")
+
+    build_plugin_code(debug, optim, config)
+    build_vstsdk(debug, optim, config)
+    build_wrapper(debug, optim, config)
+    # build_imgui(debug, optim)
+    final_build(debug, optim, config)
 
     Print("Done")
     return
 
-
-main()
+if __name__ == "__main__":
+    main()
