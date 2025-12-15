@@ -10,8 +10,6 @@ import "core:slice"
 import "core:fmt"
 import "core:strings"
 import "core:strconv"
-// import "vendor:directx/d3d11"
-// import "vendor:directx/dxgi"
 import opengl "vendor:OpenGL"
 
 import imgui "../odin-imgui"
@@ -19,6 +17,11 @@ import imgui_win32 "../odin-imgui/imgui_impl_win32"
 import imgui_opengl "../odin-imgui/imgui_impl_opengl3"
 import clap  "../clap-odin"
 import clap_ext "../clap-odin/ext"
+
+BUILD_CONFIG :: #config(BUILD_CONFIG, "debug")
+
+PLUGIN_DESC_ID :: "hermes140.clap_ambient_" + BUILD_CONFIG
+PLUGIN_NAME    :: "Clap Ambient " + BUILD_CONFIG
 
 // une interface avec des nodes qui représentent les effets -> github.com/Nelarius/imnodes
 // on peut drag les effets dans 3 ou 4 colonnes pour donner l'ordre (on peut mettre en parallele)
@@ -28,7 +31,6 @@ import clap_ext "../clap-odin/ext"
 
 
 ParamIDs :: enum {
-
     //Global 
     InGain,
     OutGain,
@@ -142,8 +144,8 @@ dbtoa :: #force_inline proc(x: f32) -> f32 { return math.pow(10.0, x * 0.05) }
 atodb :: #force_inline proc(x: f32) -> f32 { return 20.0 * math.log10(x) }
 
 apply_gain_linear :: #force_inline proc(buffer: []f32, gain: f32) {
-    for index in 0..<len(buffer) {
-        buffer[index] *= gain
+    for &sample in buffer {
+        sample *= gain
     }
 }
 
@@ -277,6 +279,8 @@ delay_line_read_sample_lagrange :: #force_inline proc(dl: DelayLine, read_positi
     interp := read_position - f32(index1)    
     out_sample := lagrange3_interp(sample1, sample2, sample3, sample4, interp)
     
+    assert(!math.is_nan(out_sample))
+    
     return out_sample
 }
 
@@ -328,33 +332,30 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     
     //early stages
     nsamples := u32(len(bufferL))
-    early_gain := dbtoa(-6)
-    late_gain := dbtoa(-6)
         
-    for index in 0..<nsamples {
+    for index in 0..<nsamples {    
         reverb.input_buffer[index] = (bufferL[index] + bufferR[index])*0.5
     }
 
-    // for allpass_index in 0..<len(reverb.early.allpasses) {
-    for allpass_index in 0..<3 {
+    for allpass_index in 0..<len(reverb.early.allpasses) {
         allpass_process_buffer(&reverb.early.allpasses[allpass_index], reverb.input_buffer)
     }
-
-    for index in 0..<nsamples {
-        bufferL[index] += reverb.input_buffer[index] * early_gain
-        bufferR[index] += reverb.input_buffer[index] * early_gain
-    }
+    
+    // for index in 0..<len(bufferL) {
+    //     bufferL[index] = math.lerp(bufferL[index], reverb.input_buffer[index], reverb.mix)
+    //     bufferR[index] = math.lerp(bufferR[index], reverb.input_buffer[index], reverb.mix)
+    // }
 
     { //late  
     // screams SIMD    
-        fdn_order : int : 4
-        mixing_matrix := [4][4]f32 { {1,  1,  1,  1},
-                                     {1, -1,  1, -1},
-                                     {1,  1, -1, -1},
-                                     {1, -1, -1,  1}, }
+        fdn_order :: 4
+        @static feedback_matrix := [fdn_order][fdn_order]f32 { {1,  1,  1,  1},
+                                                               {1, -1,  1, -1},
+                                                               {1,  1, -1, -1},
+                                                               {1, -1, -1,  1}, }
 
 
-        mod_amount : f32 = 1.0
+        mod_amount : f32 = 10.0
         for channel in 0..<fdn_order {
             lfo_fill_buffers(&reverb.late.lfos[channel], nsamples)
         }
@@ -371,12 +372,12 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
                                                                          read_index_frac)
             }
             
-            bufferL[index] += delay_outputs[2] * late_gain
-            bufferR[index] += delay_outputs[3] * late_gain
+            bufferL[index] = math.lerp(bufferL[index], delay_outputs[2], reverb.mix)
+            bufferR[index] = math.lerp(bufferR[index], delay_outputs[3], reverb.mix)
             
             for channel in 0..<fdn_order {
                 for matrix_index in 0..<fdn_order {
-                    mixing_outputs[channel] += delay_outputs[channel]*mixing_matrix[channel][matrix_index]
+                    mixing_outputs[channel] += delay_outputs[matrix_index]*feedback_matrix[channel][matrix_index]
                 }
                 mixing_outputs[channel] *= 0.5
             }            
@@ -740,6 +741,9 @@ PluginData :: struct {
     audio_param_values: [ParamIDs]f32,
     param_is_in_edit: [ParamIDs]bool, 
     main_to_audio_fifo: EventFIFO,
+    
+    input_gain: RampedValue,
+    output_gain: RampedValue,
 
     main_arena: vmem.Arena,
     echo_arena: vmem.Arena,
@@ -1229,11 +1233,15 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
     plugin.min_buffer_size = min_buffer_size
     plugin.max_buffer_size = max_buffer_size
     
-    // {
-    //     error := vmem.arena_init_growing(&plugin.main_arena, 4 * mem.Megabyte)
-    //     ensure(error == nil)
-    //     allocator := vmem.arena_allocator(&plugin.main_arena)
-    // }
+    {
+        error := vmem.arena_init_growing(&plugin.main_arena, 4 * mem.Megabyte)
+        ensure(error == nil)
+        allocator := vmem.arena_allocator(&plugin.main_arena)
+        
+        ramped_value_init(&plugin.input_gain, parameter_infos[.InGain].default_value, max_buffer_size, allocator)
+        ramped_value_init(&plugin.output_gain, parameter_infos[.OutGain].default_value, max_buffer_size, allocator)
+    
+    }
     
     {
         error := vmem.arena_init_growing(&plugin.echo_arena, 4 * mem.Megabyte)
@@ -1270,11 +1278,11 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         ensure(error == nil)
         allocator := vmem.arena_allocator(&plugin.reverb_arena)
         
-        early_allpass_max_delay := ms_to_samples(200.0, plugin.samplerate)
+        early_allpass_max_delay := ms_to_samples(40.0, plugin.samplerate)
         
-        // early_times := [4]f32{20.638905, 41.27781, 82.55562, 165.11124}
-        early_times := [4]f32{6.57, 18.79, 34.26, 163.26}
-        early_gains := [4]f32{0.5, 0.7, 0.6, 0.85}
+        // early_times := [4]f32{6.57, 18.79, 34.26, 163.26}
+        early_times := [4]f32{3.56, 4.96, 8.45, 12.67}
+        early_gains := [4]f32{0.5,  0.7,  0.6,  0.85}
                 
         for index in 0..<len(reverb.early.allpasses) {
             filter := &reverb.early.allpasses[index]
@@ -1287,7 +1295,7 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         
         fdn_max_delay := int(300.0 * 0.001 * samplerate)
         fdn_delays_ms := [4]f32{6.545286, 22.525751, 66.72586, 81.037285}
-        reverb.late.feedback = 0.8
+        reverb.late.feedback = plugin.audio_param_values[.ReverbDecay]
         
         for channel in 0..<len(reverb.late.lfos) {
             lfo_init(&reverb.late.lfos[channel], 0.5, plugin.samplerate, max_buffer_size, allocator)        
@@ -1298,7 +1306,7 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
             slice.zero(reverb.late.delay_lines[channel].buffer)
             reverb.late.delay_frac[channel] = ms_to_samples_frac(fdn_delays_ms[channel], plugin.samplerate)
             
-            make_lowpass1(&reverb.late.lp_filters[channel], 5000.0, plugin.samplerate)
+            make_lowpass1(&reverb.late.lp_filters[channel], plugin.audio_param_values[.ReverbTone], plugin.samplerate)
         }
         
         mem.zero(&reverb.late.lp_state, len(&reverb.late.lp_state) * len(&reverb.late.lp_state[0]) * size_of(f32))
@@ -1337,7 +1345,6 @@ process_event :: proc(plugin: ^PluginData, event: ^clap.Event_Header) {
         param_index := cast(ParamIDs)param_event.param_id
         
         handle_parameter_change(plugin, param_index, f32(param_event.value))
-        plugin.audio_param_values[param_index] = f32(param_event.value)
     }
 }
 
@@ -1346,9 +1353,12 @@ handle_parameter_change :: proc(plugin: ^PluginData, param_index: ParamIDs, valu
 
     switch param_index {
         case .InGain: {
+            ramped_value_new_target(&plugin.input_gain, dbtoa(value), plugin.samplerate)
         }
         case .OutGain: {
+            ramped_value_new_target(&plugin.output_gain, dbtoa(value), plugin.samplerate)
         }
+        
         case .EchoTime: {
             new_delay_frac := ms_to_samples_frac(value, plugin.samplerate)
             ramped_value_new_target(&plugin.echo.delay_frac, new_delay_frac, plugin.samplerate)
@@ -1371,11 +1381,17 @@ handle_parameter_change :: proc(plugin: ^PluginData, param_index: ParamIDs, valu
             ramped_value_new_target(&plugin.echo.mix, value, plugin.samplerate)
         }
         
-        case .ReverbDecay: {}
+        case .ReverbDecay: {
+            plugin.reverb.late.feedback = value
+        }
         case .ReverbSize: {}
         case .ReverbEarlyDiffusion: {}
         case .ReverbLateDiffusion: {}
-        case .ReverbTone: {}
+        case .ReverbTone: {
+            for &filter in plugin.reverb.late.lp_filters {
+                make_lowpass1(&filter, value, plugin.samplerate)
+            }
+        }
         case .ReverbMix: {
             plugin.reverb.mix = value
         }
@@ -1500,8 +1516,7 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
             outputL : []f32 = process.audio_outputs[0].data32[0][current_frame_index:current_frame_index + nsamples]
             outputR : []f32 = process.audio_outputs[0].data32[1][current_frame_index:current_frame_index + nsamples]
             
-            
-            // echo_process(&plugin.echo, inputL, inputR)
+            echo_process(&plugin.echo, inputL, inputR)
             
             reverb_process(&plugin.reverb, inputL, inputR)
             
@@ -1579,9 +1594,6 @@ plugin_factory := clap.Plugin_Factory {
 }
 
 plugin_features: []cstring 
-
-PLUGIN_DESC_ID :: "hermes140.clap_ambient"
-PLUGIN_NAME    :: "Clap Ambient"
 
 @(export, rodata)
 clap_entry := clap.Plugin_Entry {

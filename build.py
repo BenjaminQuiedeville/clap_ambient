@@ -5,7 +5,7 @@ import sys
 
 vst_sdk_dir = "../../libs/vst3sdk"
 
-common_cpp_flags = " "/join([
+common_cpp_flags = " ".join([
     "/nologo /MP /W3 /WX- /diagnostics:column /EHsc",
     "/fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20",
     "/external:W3 /Gd /TP /errorReport:queue"
@@ -32,7 +32,7 @@ def build_plugin_code(debug: bool, optim: bool, config: str):
     if not os.path.exists(build_dir):
         os.makedirs(build_dir)
 
-    command = f"odin build source -out:{build_dir}/plugin_code.obj {flags}"
+    command = f"odin build source -define:BUILD_CONFIG={config} -out:{build_dir}/plugin_code.obj {flags}"
     run(command)
     return
 
