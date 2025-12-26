@@ -26,7 +26,7 @@ def build_plugin_code(debug: bool, optim: bool, config: str):
     
     flags = "-build-mode:object -vet-semicolon"
     if debug: flags += " -debug"
-    if optim: flags += " -o:speed"
+    if optim: flags += " -o:speed -target-features:\"avx2\""
 
     build_dir = f"build/{config}/odin_code"
     if not os.path.exists(build_dir):
@@ -371,7 +371,7 @@ def main():
     build_plugin_code(debug, optim, config)
     build_vstsdk(debug, optim, config)
     build_wrapper(debug, optim, config)
-    # build_imgui(debug, optim)
+    # build_imgui(debug)
     final_build(debug, optim, config)
 
     Print("Done")
