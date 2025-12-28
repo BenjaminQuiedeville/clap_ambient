@@ -9,9 +9,22 @@
             "modernui": 1
         },
         "classnamespace": "box",
-        "rect": [ 199.0, 114.0, 1522.0, 801.0 ],
+        "rect": [ 34.0, 77.0, 1493.0, 939.0 ],
         "subpatcher_template": "empty_mixer",
         "boxes": [
+            {
+                "box": {
+                    "id": "obj-7",
+                    "maxclass": "spectroscope~",
+                    "monochrome": 0,
+                    "numinlets": 2,
+                    "numoutlets": 1,
+                    "outlettype": [ "" ],
+                    "patching_rect": [ 369.0, 519.0, 235.0, 403.0 ],
+                    "scroll": 3,
+                    "sono": 1
+                }
+            },
             {
                 "box": {
                     "id": "obj-28",
@@ -69,7 +82,7 @@
                             "isbase64": 1,
                             "sliderorder": [],
                             "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ],
-                            "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3BQP4hKt3xJt3hKtbyPt3hK18jKtvlVFEjKt3xMCwyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
+                            "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hRP4hKtX1Jt3hKtbyPt3hK18jKtvlVFEjKt3xMCwyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
                         },
                         "snapshotlist": {
                             "current_snapshot": 0,
@@ -93,7 +106,7 @@
                                         "isbase64": 1,
                                         "sliderorder": [],
                                         "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ],
-                                        "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3BQP4hKt3xJt3hKtbyPt3hK18jKtvlVFEjKt3xMCwyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
+                                        "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hRP4hKtX1Jt3hKtbyPt3hK18jKtvlVFEjKt3xMCwyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
                                     },
                                     "fileref": {
                                         "name": "Clap Ambient (CLAP->VST3)",
@@ -151,7 +164,7 @@
                     "numinlets": 2,
                     "numoutlets": 1,
                     "outlettype": [ "bang" ],
-                    "patching_rect": [ 424.0, 502.0, 331.0, 110.0 ]
+                    "patching_rect": [ 748.0, 488.0, 331.0, 110.0 ]
                 }
             },
             {
@@ -304,16 +317,6 @@
                     "outlettype": [ "bang" ],
                     "parameter_enable": 0,
                     "patching_rect": [ 244.0, 152.0, 24.0, 24.0 ]
-                }
-            },
-            {
-                "box": {
-                    "automatic": 1,
-                    "id": "obj-23",
-                    "maxclass": "scope~",
-                    "numinlets": 2,
-                    "numoutlets": 0,
-                    "patching_rect": [ 864.0, 527.0, 422.0, 220.0 ]
                 }
             },
             {
@@ -621,14 +624,14 @@
             },
             {
                 "patchline": {
-                    "destination": [ "obj-23", 0 ],
+                    "destination": [ "obj-25", 0 ],
                     "order": 0,
                     "source": [ "obj-1", 0 ]
                 }
             },
             {
                 "patchline": {
-                    "destination": [ "obj-25", 0 ],
+                    "destination": [ "obj-7", 0 ],
                     "order": 1,
                     "source": [ "obj-1", 0 ]
                 }
@@ -818,14 +821,6 @@
         "parameters": {
             "obj-1": [ "vst~", "vst~", 0 ],
             "obj-17": [ "live.gain~[1]", "OutLevel", 0 ],
-            "parameterbanks": {
-                "0": {
-                    "index": 0,
-                    "name": "",
-                    "parameters": [ "-", "-", "-", "-", "-", "-", "-", "-" ],
-                    "buttons": [ "-", "-", "-", "-", "-", "-", "-", "-" ]
-                }
-            },
             "inherited_shortname": 1
         },
         "autosave": 0,

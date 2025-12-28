@@ -54,6 +54,7 @@ ParamIDs :: enum {
 
 ParamInfo :: struct {
     name: string,
+    format_string: string,
     min: f32,
     max: f32,
     default_value: f32,
@@ -64,74 +65,74 @@ ParamInfo :: struct {
 @(rodata)
 parameter_infos := [ParamIDs]ParamInfo {
     .InGain = {
-        name = "Input Gain (dB)", min = -60.0, max = 6.0, default_value = 0.0,
+        name = "Input Gain (dB)", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .OutGain = {
-        name = "Output Gain (dB)", min = -60.0, max = 6.0, default_value = 0.0,
+        name = "Output Gain (dB)", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
 
     .EchoTime = {
-        name = "Delay Time", min = 1.0, max = 2000.0, default_value = 300.0,
+        name = "Delay Time", format_string = "%.2f ms", min = 1.0, max = 2000.0, default_value = 300.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE
     },
     .EchoFeedback = {
-        name = "Feedback", min = 0.0, max = 1.0, default_value = 0.5,
+        name = "Feedback", format_string = "%.2f %%", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE
     },
     .EchoTone = {
-        name = "Echo tone", min = 500.0, max = 20000.0, default_value = 20000.0,
+        name = "Echo tone", format_string = "%.2f Hz", min = 500.0, max = 20000.0, default_value = 20000.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange, .Logarithmic}, 
         clap_param_flags = .AUTOMATABLE,
     },
     .EchoModFreq = {
-        name = "Echo mod freq", min = 0.0, max = 10.0, default_value = 1.0,
+        name = "Echo mod freq", format_string = "%.2f Hz", min = 0.0, max = 10.0, default_value = 1.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .EchoModAmount = {
-        name = "Echo mod amount", min = 0.0, max = 1.0, default_value = 0.0,
+        name = "Echo mod amount", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .EchoMix = {
-        name = "Mix", min = 0.0, max = 1.0, default_value = 0.0,
+        name = "Mix", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE
     },
 
     .ReverbDecay = {
-        name = "Reverb decay", min = 0.0, max = 100.0, default_value = 3.0,
+        name = "Reverb decay", format_string = "%.2f%%", min = 0.0, max = 100.0, default_value = 5.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,     
     },
     .ReverbSize = {
-        name = "Reverb size", min = 1.0, max = 5.0, default_value = 1.0,
+        name = "Reverb size", format_string = "%.2f", min = 1.0, max = 5.0, default_value = 1.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .ReverbEarlyDiffusion = {
-        name = "Reverb Early Diffusion", min = 0.0, max = 1.0, default_value = 0.5,
+        name = "Reverb Early Diffusion", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .ReverbLateDiffusion = {
-        name = "Reverb Late Diffusion", min = 0.0, max = 1.0, default_value = 0.5,
+        name = "Reverb Late Diffusion", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .ReverbTone = {
-        name = "Reverb Tone", min = 200.0, max = 20000.0, default_value = 15000.0,
+        name = "Reverb Tone", format_string = "%.2f", min = 200.0, max = 20000.0, default_value = 15000.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange, .Logarithmic},
         clap_param_flags = .AUTOMATABLE,
     },
     .ReverbMix = {
-        name = "Reverb mix", min = 0.0, max = 1.0, default_value = 0.5,
+        name = "Reverb mix", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
@@ -380,24 +381,18 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     output_buffers: [2][]f32 = { reverb.output_buffers[0][:nsamples], 
                                  reverb.output_buffers[1][:nsamples] }
     
-    for index in 0..<nsamples {    
-        reverb_input_buf[index] = (bufferL[index] + bufferR[index])*0.5
-    }
 
-    copy(reverb_early_buf, reverb_input_buf)    
+    copy(reverb_early_buf, bufferL)    
     allpass2_process_buffer(&reverb.early.allpasses[0], reverb_early_buf)
     allpass2_process_buffer(&reverb.early.allpasses[1], reverb_early_buf)
-    
     copy(output_buffers[0], reverb_early_buf)
-    copy(output_buffers[1], reverb_early_buf)
+    
 
-
-    copy(reverb_early_buf, reverb_input_buf)
+    copy(reverb_early_buf, bufferR)
     allpass2_process_buffer(&reverb.early.allpasses[2], reverb_early_buf)
     allpass2_process_buffer(&reverb.early.allpasses[3], reverb_early_buf)
+    copy(output_buffers[1], reverb_early_buf)
     
-    add_buffers(output_buffers[0], reverb_early_buf)
-    add_buffers(output_buffers[1], reverb_early_buf)
 
     { //late  
     // screams SIMD
@@ -427,7 +422,8 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
             }
 
             // fdn_in_sample := output_buffers[0][index]
-            fdn_in_sample := reverb_early_buf[index]
+            fdn_in_sampleL := output_buffers[0][index]
+            fdn_in_sampleR := output_buffers[1][index]
             
             
             for channel in 0..<FDN_ORDER {
@@ -455,7 +451,10 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
                 delay_in := biquad_process_sample(reverb.late.lp_filters[channel], reverb.late.lp_state[channel][:], mixing_outputs[channel])
             
                 delay_in *= feedback
-                delay_in += fdn_in_sample
+                delay_in += (channel == 0 ? fdn_in_sampleL 
+                           : channel == 1 ? fdn_in_sampleR 
+                           : 0.0)
+                           
                 delay_line_push_sample(&reverb.late.delay_lines[channel], delay_in)
             }
         }
@@ -938,25 +937,8 @@ param_convert_value_to_text :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Cl
     param_index := cast(ParamIDs)param_id
 
     out_string := strings.string_from_ptr(out_buffer, int(out_buffer_capacity))
-    format_string: string
+    format_string := parameter_infos[param_index].format_string
     
-    switch param_index {
-        case .InGain, .OutGain:     { format_string = "%.2f dB" }
-        case .EchoTime:             { format_string = "%.2f ms" }
-        case .EchoFeedback:         { format_string = "%.2f" }
-        case .EchoTone:             { format_string = "%.2f Hz" }
-        case .EchoModFreq:          { format_string = "%.2f Hz" }
-        case .EchoModAmount:        { format_string = "%.2f" }
-        case .EchoMix:              { format_string = "%.2f" }
-        
-        case .ReverbDecay:          { format_string = "%.2f" }
-        case .ReverbSize:           { format_string = "%.2f" }
-        case .ReverbEarlyDiffusion: { format_string = "%.2f" }
-        case .ReverbLateDiffusion:  { format_string = "%.2f" }
-        case .ReverbTone:           { format_string = "%.2f" }
-        case .ReverbMix:            { format_string = "%.2f" }
-        case: { return false }
-    }
     fmt.bprintf(transmute([]u8)out_string, format_string, value)
 
     return true
@@ -1030,13 +1012,15 @@ gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floa
     return true 
 }
 
-make_slider :: proc(plugin: ^PluginData, param_index: ParamIDs, format: string) {
+make_slider :: proc(plugin: ^PluginData, param_index: ParamIDs) {
     
-    slider_has_changed := imgui.SliderFloat(strings.clone_to_cstring(parameter_infos[param_index].name),
+    infos := &parameter_infos[param_index]
+    
+    slider_has_changed := imgui.SliderFloat(strings.clone_to_cstring(infos.name),
                                             &plugin.main_param_values[param_index],
-                                            parameter_infos[param_index].min,
-                                            parameter_infos[param_index].max,
-                                            strings.clone_to_cstring(format), parameter_infos[param_index].imgui_flags)
+                                            infos.min, infos.max,
+                                            strings.clone_to_cstring(infos.format_string), 
+                                            infos.imgui_flags)
                                             
     if slider_has_changed {
         
@@ -1074,6 +1058,12 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
     }
 
     switch message {
+        case win32.WM_SIZE: {
+            if wParam != win32.SIZE_MINIMIZED {
+                gui.width  = cast(int)win32.LOWORD(lParam)
+                gui.height = cast(int)win32.HIWORD(lParam)
+            }
+        }
         case win32.WM_TIMER: {
             plugin_sync_audio_to_main(plugin)            
             
@@ -1082,35 +1072,35 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
             imgui_opengl.NewFrame()
             imgui_win32.NewFrame()
             imgui.NewFrame()
-            
-            viewport := imgui.GetMainViewport()
-            imgui.SetNextWindowPos(viewport.WorkPos)
-            imgui.SetNextWindowSize(viewport.WorkSize)
-            
+                        
             io := imgui.GetIO()
                         
             {
-                open: bool = true
-                imgui.Begin("clap ambient plugin", &open, imgui.WindowFlags_NoDecoration)
+                viewport := imgui.GetMainViewport()
+                imgui.SetNextWindowPos({0, 0})
+                imgui.SetNextWindowSize({viewport.WorkSize.x/2, viewport.WorkSize.y})
 
-                make_slider(plugin, .InGain, "%.2f")
-                make_slider(plugin, .OutGain, "%.2f")
+                open: bool = true
+                imgui.Begin("clap ambient plugin", &open, {.NoCollapse})
+
+                make_slider(plugin, .InGain)
+                make_slider(plugin, .OutGain)
 
                 imgui.SeparatorText("Echo")
-                make_slider(plugin, .EchoTime, "%.2f")
-                make_slider(plugin, .EchoFeedback, "%.2f")
-                make_slider(plugin, .EchoTone, "%.2f")
-                make_slider(plugin, .EchoModFreq, "%.2f")
-                make_slider(plugin, .EchoModAmount, "%.2f")
-                make_slider(plugin, .EchoMix, "%.2f")
+                make_slider(plugin, .EchoTime)
+                make_slider(plugin, .EchoFeedback)
+                make_slider(plugin, .EchoTone)
+                make_slider(plugin, .EchoModFreq)
+                make_slider(plugin, .EchoModAmount)
+                make_slider(plugin, .EchoMix)
     
                 imgui.SeparatorText("Reverb")
-                make_slider(plugin, .ReverbDecay, "%.2f")
-                make_slider(plugin, .ReverbSize, "%.2f")
-                make_slider(plugin, .ReverbEarlyDiffusion, "%.2f")
-                make_slider(plugin, .ReverbLateDiffusion, "%.2f")
-                make_slider(plugin, .ReverbTone, "%.2f")
-                make_slider(plugin, .ReverbMix, "%.2f")
+                make_slider(plugin, .ReverbDecay)
+                make_slider(plugin, .ReverbSize)
+                make_slider(plugin, .ReverbEarlyDiffusion)
+                make_slider(plugin, .ReverbLateDiffusion)
+                make_slider(plugin, .ReverbTone)
+                make_slider(plugin, .ReverbMix)
 
                 if imgui.Button("Clear all buffers") {
                     // clear all buffers
@@ -1157,8 +1147,8 @@ create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) 
     gui.window_class.style = win32.CS_OWNDC | win32.CS_DBLCLKS
     win32.RegisterClassW(&gui.window_class)
     
-    gui.width = 600
-    gui.height = 400
+    gui.width = 800
+    gui.height = 600
     gui.window = win32.CreateWindowW(gui.window_class.lpszClassName, 
                                     PLUGIN_NAME, 
                                     win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_CLIPSIBLINGS, 
@@ -1182,6 +1172,7 @@ destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {
 }
 
 set_gui_scale :: proc "c" (_plugin: ^clap.Plugin, scale: f64) -> bool { return false }
+
 get_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool { 
     plugin := transmute(^PluginData)_plugin.plugin_data
     
@@ -1190,20 +1181,39 @@ get_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool {
     return true
 }
 
-can_gui_resize :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
-get_gui_resize_hints :: proc "c" (_plugin: ^clap.Plugin, hints: ^clap_ext.Gui_Resize_Hints) -> bool { return false }
-adjust_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool { return get_gui_size(_plugin, width, height) }
-set_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool { return true }
+gui_can_resize :: proc "c" (_plugin: ^clap.Plugin) -> bool { return true }
 
-set_gui_parent :: proc "c" (_plugin: ^clap.Plugin, parent_window: ^clap_ext.Window) -> bool {
+// unused by wrapasvst3
+gui_get_resize_hints :: proc "c" (_plugin: ^clap.Plugin, hints: ^clap_ext.Gui_Resize_Hints) -> bool { 
+
+    hints.can_resize_horizontally = true
+    hints.can_resize_vertically = true
+    hints.preserve_aspect_ratio = false
+    hints.aspect_ratio_width = 0
+    hints.aspect_ratio_height = 0
+
+    return true 
+}
+
+gui_adjust_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool { 
+    return get_gui_size(_plugin, width, height) 
+}
+
+gui_set_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool { 
+    
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    plugin.gui.width = int(width)
+    plugin.gui.height = int(height)
+
+    return true 
+}
+
+gui_set_parent :: proc "c" (_plugin: ^clap.Plugin, parent_window: ^clap_ext.Window) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
     
     win32.SetParent(plugin.gui.window, transmute(win32.HWND)parent_window.handle.win32)
     return true
 }
-
-set_gui_transient :: proc "c" (_plugin: ^clap.Plugin, window: ^clap_ext.Window) -> bool { return false }
-suggest_gui_title :: proc "c" (_plugin: ^clap.Plugin, title: cstring) {}
 
 show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool { 
     context = runtime.default_context()
@@ -1311,13 +1321,13 @@ gui_extension := clap_ext.Plugin_Gui {
     destroy = destroy_gui,
     set_scale = set_gui_scale,
     get_size = get_gui_size,
-    can_resize = can_gui_resize,
-    get_resize_hints = get_gui_resize_hints,
-    adjust_size = adjust_gui_size,
-    set_size = set_gui_size,
-    set_parent = set_gui_parent,
-    set_transient = set_gui_transient,
-    suggest_title = suggest_gui_title,
+    can_resize = gui_can_resize,
+    get_resize_hints = gui_get_resize_hints,
+    adjust_size = gui_adjust_size,
+    set_size = gui_set_size,
+    set_parent = gui_set_parent,
+    set_transient = proc "c" (_plugin: ^clap.Plugin, window: ^clap_ext.Window) -> bool { return false },
+    suggest_title = proc "c" (_plugin: ^clap.Plugin, title: cstring) {},
     show = show_gui,
     hide = hide_gui,
 }
@@ -1419,7 +1429,7 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         
         fdn_max_delay := ms_to_samples(300.0 * parameter_infos[.ReverbSize].max, plugin.samplerate)
         
-        init_feedback := reverb_compute_feedback(plugin.audio_param_values[.ReverbDecay], fdn_delays_ms[FDN_ORDER-1])
+        init_feedback := plugin.audio_param_values[.ReverbDecay]
         ramped_value_init(&reverb.late.feedback, init_feedback, 0, allocator)
                           
         
@@ -1522,10 +1532,15 @@ handle_parameter_change :: proc(plugin: ^PluginData, param_index: ParamIDs, valu
         }
         
         case .ReverbDecay: {
-            max_delay_time := samples_to_ms(plugin.reverb.late.delays_frac[FDN_ORDER-1].target, plugin.samplerate)
-            new_feedback := reverb_compute_feedback(plugin.audio_param_values[.ReverbDecay], max_delay_time)
+            // mauvais calcul du decay        
+            scaled_decay := scale(plugin.audio_param_values[.ReverbDecay], 
+                                  parameter_infos[.ReverbDecay].min, parameter_infos[.ReverbDecay].max, 
+                                  0.0, 1.0, 0.3)
+        
+            // max_delay_time := samples_to_ms(plugin.reverb.late.delays_frac[FDN_ORDER-1].target, plugin.samplerate)
+            // new_feedback := reverb_compute_feedback(scaled_decay, max_delay_time)
                                                     
-            ramped_value_new_target(&plugin.reverb.late.feedback, new_feedback, plugin.samplerate)
+            ramped_value_new_target(&plugin.reverb.late.feedback, scaled_decay, plugin.samplerate)
         }
         case .ReverbSize: {
         
@@ -1536,10 +1551,14 @@ handle_parameter_change :: proc(plugin: ^PluginData, param_index: ParamIDs, valu
                 ramped_value_new_target(&delay_frac, delay_time, plugin.samplerate)
             }
 
-            max_delay_time := samples_to_ms(plugin.reverb.late.delays_frac[FDN_ORDER-1].target, plugin.samplerate)
-            new_feedback := reverb_compute_feedback(plugin.audio_param_values[.ReverbDecay], max_delay_time)
+            scaled_decay := scale(plugin.audio_param_values[.ReverbDecay], 
+                                  parameter_infos[.ReverbDecay].min, parameter_infos[.ReverbDecay].max, 
+                                  0.0, 1.0, 0.3)
+
+            // max_delay_time := samples_to_ms(plugin.reverb.late.delays_frac[FDN_ORDER-1].target, plugin.samplerate)
+            // new_feedback := reverb_compute_feedback(scaled_decay, max_delay_time)
             
-            ramped_value_new_target(&plugin.reverb.late.feedback, new_feedback, plugin.samplerate)
+            ramped_value_new_target(&plugin.reverb.late.feedback, scaled_decay, plugin.samplerate)
             
         }
         case .ReverbEarlyDiffusion: {}

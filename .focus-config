@@ -9,6 +9,8 @@ C:/Odin/vendor
 ../clap
 
 [ignore]
+temp
+dear_bindings
 
 
 [[build commands]]
