@@ -1012,8 +1012,8 @@ gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floa
     return true 
 }
 
-make_slider :: proc(plugin: ^PluginData, param_index: ParamIDs) {
-    
+make_hslider :: proc(plugin: ^PluginData, param_index: ParamIDs) {
+
     infos := &parameter_infos[param_index]
     
     slider_has_changed := imgui.SliderFloat(strings.clone_to_cstring(infos.name),
@@ -1021,8 +1021,25 @@ make_slider :: proc(plugin: ^PluginData, param_index: ParamIDs) {
                                             infos.min, infos.max,
                                             strings.clone_to_cstring(infos.format_string), 
                                             infos.imgui_flags)
-                                            
-    if slider_has_changed {
+
+    handle_widget_update(plugin, param_index, slider_has_changed)
+}
+
+make_vslider :: proc(plugin: ^PluginData, param_index: ParamIDs, size: imgui.Vec2) {
+    infos := &parameter_infos[param_index]
+    
+    slider_has_changed := imgui.VSliderFloat(strings.clone_to_cstring(infos.name), size,
+                                            &plugin.main_param_values[param_index],
+                                            infos.min, infos.max,
+                                            strings.clone_to_cstring(infos.format_string), 
+                                            infos.imgui_flags)
+
+    handle_widget_update(plugin, param_index, slider_has_changed)
+}
+
+handle_widget_update :: proc(plugin: ^PluginData, param_index: ParamIDs, widget_has_changed: bool) {
+                                                
+    if widget_has_changed {
         
         if !plugin.param_is_in_edit[param_index] {
             plugin.param_is_in_edit[param_index] = true
@@ -1064,6 +1081,11 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
                 gui.height = cast(int)win32.HIWORD(lParam)
             }
         }
+        case win32.WM_SIZING: {
+            edge := wParam
+            rect := transmute(^win32.RECT)lParam
+        
+        }
         case win32.WM_TIMER: {
             plugin_sync_audio_to_main(plugin)            
             
@@ -1074,38 +1096,53 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
             imgui.NewFrame()
                         
             io := imgui.GetIO()
-                        
+            viewport := imgui.GetMainViewport()
+            position := viewport.WorkPos
+            size := viewport.WorkSize
+            
+            next_pos: [4]int = {0, 0, 0, 0}
             {
-                viewport := imgui.GetMainViewport()
                 imgui.SetNextWindowPos({0, 0})
-                imgui.SetNextWindowSize({viewport.WorkSize.x/2, viewport.WorkSize.y})
-
+                imgui.SetNextWindowSize({size.x, size.y})
+                
                 open: bool = true
-                imgui.Begin("clap ambient plugin", &open, {.NoCollapse})
+                imgui.Begin("Mainwindow", &open, {.NoCollapse})
 
-                make_slider(plugin, .InGain)
-                make_slider(plugin, .OutGain)
+                imgui.BeginChild("Volumes", {100, size.y})
+                make_vslider(plugin, .InGain, {20, 200})
+                imgui.SameLine()
+                make_vslider(plugin, .OutGain, {20, 200})
+                imgui.EndChild()
+                
+                imgui.SameLine()
+                
+                imgui.BeginChild("Echo", {400, size.y})
 
-                imgui.SeparatorText("Echo")
-                make_slider(plugin, .EchoTime)
-                make_slider(plugin, .EchoFeedback)
-                make_slider(plugin, .EchoTone)
-                make_slider(plugin, .EchoModFreq)
-                make_slider(plugin, .EchoModAmount)
-                make_slider(plugin, .EchoMix)
-    
-                imgui.SeparatorText("Reverb")
-                make_slider(plugin, .ReverbDecay)
-                make_slider(plugin, .ReverbSize)
-                make_slider(plugin, .ReverbEarlyDiffusion)
-                make_slider(plugin, .ReverbLateDiffusion)
-                make_slider(plugin, .ReverbTone)
-                make_slider(plugin, .ReverbMix)
+                make_hslider(plugin, .EchoTime)
+                make_hslider(plugin, .EchoFeedback)
+                make_hslider(plugin, .EchoTone)
+                make_hslider(plugin, .EchoModFreq)
+                make_hslider(plugin, .EchoModAmount)
+                make_hslider(plugin, .EchoMix)
+                
+                imgui.EndChild()
+                
+                imgui.SameLine()                
+        
+                imgui.BeginChild("Reverb", {400, size.y})
+        
+                make_hslider(plugin, .ReverbDecay)
+                make_hslider(plugin, .ReverbSize)
+                make_hslider(plugin, .ReverbEarlyDiffusion)
+                make_hslider(plugin, .ReverbLateDiffusion)
+                make_hslider(plugin, .ReverbTone)
+                make_hslider(plugin, .ReverbMix)
 
                 if imgui.Button("Clear all buffers") {
                     // clear all buffers
                 }
                 
+                imgui.EndChild()                
                 imgui.End()
             }
             
@@ -1147,8 +1184,8 @@ create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) 
     gui.window_class.style = win32.CS_OWNDC | win32.CS_DBLCLKS
     win32.RegisterClassW(&gui.window_class)
     
-    gui.width = 800
-    gui.height = 600
+    gui.width = 1000
+    gui.height = 400
     gui.window = win32.CreateWindowW(gui.window_class.lpszClassName, 
                                     PLUGIN_NAME, 
                                     win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_CLIPSIBLINGS, 
@@ -1171,7 +1208,7 @@ destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {
     win32.UnregisterClassW(PLUGIN_DESC_ID, nil)
 }
 
-set_gui_scale :: proc "c" (_plugin: ^clap.Plugin, scale: f64) -> bool { return false }
+set_gui_scale :: proc "c" (_plugin: ^clap.Plugin, scale: f64) -> bool { return true }
 
 get_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool { 
     plugin := transmute(^PluginData)_plugin.plugin_data
@@ -1181,9 +1218,9 @@ get_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool {
     return true
 }
 
-gui_can_resize :: proc "c" (_plugin: ^clap.Plugin) -> bool { return true }
+gui_can_resize :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
 
-// unused by wrapasvst3
+// unused in wrapasvst3
 gui_get_resize_hints :: proc "c" (_plugin: ^clap.Plugin, hints: ^clap_ext.Gui_Resize_Hints) -> bool { 
 
     hints.can_resize_horizontally = true
@@ -1204,6 +1241,8 @@ gui_set_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
     plugin.gui.width = int(width)
     plugin.gui.height = int(height)
+
+    win32.SetWindowPos(plugin.gui.window, nil, 0, 0, i32(width), i32(height), win32.SWP_NOMOVE | win32.SWP_NOOWNERZORDER | win32.SWP_NOZORDER)
 
     return true 
 }
