@@ -72,31 +72,24 @@ def build_imgui(debug: bool):
     
     return 
 
-def build_clap(debug: bool):
-    """
-    --- building plugin entry and linking clap plugin
-    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\CL.exe
-    /c /Zi/nologo /W3 /WX- /diagnostics:column /Od /Ob0
-    /D _WINDLL /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\"Debug\"" /D clap_echo_clap_EXPORTS
-    /EHsc /MD /GS /arch:AVX2 /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20 /RTC1
-    /Fo"clap_echo_clap.dir\Debug\\" /Fd"clap_echo_clap.dir\Debug\vc143.pdb" /external:W3 /Gd /TP /errorReport:queue
-    W:\clap\clap_echo\source\plugin_entry.cpp
+# def link_clap(debug: bool):
 
-    Link:
-    C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\link.exe
-    /ERRORREPORT:QUEUE /OUT:"W:\clap\clap_echo\build_msvc\CLAP\Debug\clap_echo.clap" /INCREMENTAL /ILK:"clap_echo_clap.dir\Debug\clap_echo.ilk"
-    /NOLOGO
-    Debug\clap_echo_static.lib
-    opengl32.lib kernel32.lib user32.lib
-    gdi32.lib winspool.lib shell32.lib
-    ole32.lib oleaut32.lib uuid.lib
-    comdlg32.lib advapi32.lib
-    /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'"
-    /manifest:embed /DEBUG /PDB:"C:/Users/benjamin/Dev/clap/clap_echo/build_msvc/CLAP/Debug/clap_echo.pdb"/SUBSYSTEM:CONSOLE
-    /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/benjamin/Dev/clap/clap_echo/build_msvc/Debug/clap_echo.lib"/MACHINE:X64
-    /machine:x64 /DLL clap_echo_clap.dir\Debug\plugin_entry.obj
-    """
-    return
+#     command = f"link /ERRORREPORT:QUEUE /OUT:build/Debug/clap_echo.clap /INCREMENTAL /ILK:"clap_echo_clap.dir\Debug\clap_echo.ilk" /NOLOGO "
+#     """
+
+#     C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\link.exe
+    
+#     Debug\clap_echo_static.lib
+#     opengl32.lib kernel32.lib user32.lib
+#     gdi32.lib winspool.lib shell32.lib
+#     ole32.lib oleaut32.lib uuid.lib
+#     comdlg32.lib advapi32.lib
+#     /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'"
+#     /manifest:embed /DEBUG /PDB:"C:/Users/benjamin/Dev/clap/clap_echo/build_msvc/CLAP/Debug/clap_echo.pdb"/SUBSYSTEM:CONSOLE
+#     /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/benjamin/Dev/clap/clap_echo/build_msvc/Debug/clap_echo.lib"/MACHINE:X64
+#     /machine:x64 /DLL clap_echo_clap.dir\Debug\plugin_entry.obj
+#     """
+#     return
 
 
 def build_vstsdk(debug: bool, optim: bool, config: str):
@@ -312,9 +305,12 @@ def final_build(debug: bool, optim: bool, config: str):
 
     if debug: flags += " /DEBUG"
 
-    libs = " ".join([
+    wrapper_libs = " ".join([
         f"build/{config}/clap-wrapper.lib",
         f"build/{config}/base-sdk-vst3.lib",
+    ])
+    
+    libs = " ".join([
         "opengl32.lib", "kernel32.lib", "shell32.lib", "gdi32.lib", "user32.lib",
         "ole32.lib", "oleaut32.lib", "uuid.lib", 
         "imgui.lib",
@@ -322,16 +318,23 @@ def final_build(debug: bool, optim: bool, config: str):
     
     object_files = " ".join([
         f"{entry_point_build_dir}/*.obj",
+    ])
+    
+    odin_object_files = " ".join([
         f"build/{config}/odin_code/*.obj",
     ])
 
     final_build_dir = f"build/{config}"
     out_name = f"{final_build_dir}/clap_ambient_{config}"
     
-    Print("\nFinal Linking")
-    link_command = f"lld-link {flags} {object_files} {libs} /OUT:{out_name}.vst3 /ILK:{out_name}.ilk /PDB:{out_name}.pdb /IMPLIB:{out_name}.lib"
+    Print("\nVST3 Linking")
+    link_command = f"lld-link {flags} {object_files} {odin_object_files} {libs} {wrapper_libs} /OUT:{out_name}.vst3 /ILK:{out_name}_vst3.ilk /PDB:{out_name}_vst3.pdb /IMPLIB:{out_name}_vst3.lib"
     run(link_command)
 
+    # Print("\nClap Linking")
+    # link_clap_command = f"lld-link {flags} {odin_object_files} {libs} /OUT:{out_name}.clap /ILK:{out_name}_clap.ilk /PDB:{out_name}_clap.pdb /IMPLIB:{out_name}_vst3.lib"
+    # run(link_clap_command)
+    
     return
 
 

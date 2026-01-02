@@ -65,12 +65,12 @@ ParamInfo :: struct {
 @(rodata)
 parameter_infos := [ParamIDs]ParamInfo {
     .InGain = {
-        name = "Input Gain (dB)", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
+        name = "In Gain", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
     .OutGain = {
-        name = "Output Gain (dB)", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
+        name = "Out Gain", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = .AUTOMATABLE,
     },
@@ -311,18 +311,23 @@ delay_line_read_sample_linear :: proc(dl: DelayLine, read_position: f32) -> f32 
     
     if read_position < 0.0 { read_position += f32(len(dl.buffer)) }
     if read_position >= f32(len(dl.buffer)) { read_position -= f32(len(dl.buffer)) }
+
+    assert(read_position >= 0.0)
+    assert(read_position < f32(len(dl.buffer)))
     
-    read_index1 := int(read_position)
-    read_index2 := read_index1 + 1
+    index1 := int(read_position)
+    index2 := index1 + 1
     
-    if read_index2 >= len(dl.buffer) { read_index2 -= len(dl.buffer) }
+    if index2 >= len(dl.buffer) { index2 -= len(dl.buffer) }
     
-    interp_coeff := read_position - f32(read_index1)
-    sample1 := dl.buffer[read_index1]
-    sample2 := dl.buffer[read_index2]
+    interp_coeff := read_position - f32(index1)
+    sample1 := dl.buffer[index1]
+    sample2 := dl.buffer[index2]
     
-    output_sample := math.lerp(sample1, sample2, interp_coeff)
-    return output_sample
+    out_sample := math.lerp(sample1, sample2, interp_coeff)
+    assert(!math.is_nan(out_sample))
+
+    return out_sample
 }
 
 FDN_ORDER :: 8
@@ -350,7 +355,7 @@ Reverb :: struct {
         
         allpasses: [FDN_ORDER]AllpassDelay,
         
-        lp_filters: [FDN_ORDER]Biquad,
+        lp_filter: Biquad,
         lp_state: [FDN_ORDER][2]f32,
         
         lfos: [FDN_ORDER]LFO,
@@ -378,20 +383,20 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
         
     reverb_input_buf := reverb.input_buffer[:nsamples]
     reverb_early_buf := reverb.early_stage_buffer[:nsamples]
-    output_buffers: [2][]f32 = { reverb.output_buffers[0][:nsamples], 
-                                 reverb.output_buffers[1][:nsamples] }
+    output_bufferL   := reverb.output_buffers[0][:nsamples]
+    output_bufferR   := reverb.output_buffers[1][:nsamples]
     
 
     copy(reverb_early_buf, bufferL)    
     allpass2_process_buffer(&reverb.early.allpasses[0], reverb_early_buf)
     allpass2_process_buffer(&reverb.early.allpasses[1], reverb_early_buf)
-    copy(output_buffers[0], reverb_early_buf)
+    copy(output_bufferL, reverb_early_buf)
     
 
     copy(reverb_early_buf, bufferR)
     allpass2_process_buffer(&reverb.early.allpasses[2], reverb_early_buf)
     allpass2_process_buffer(&reverb.early.allpasses[3], reverb_early_buf)
-    copy(output_buffers[1], reverb_early_buf)
+    copy(output_bufferR, reverb_early_buf)
     
 
     { //late  
@@ -421,9 +426,9 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
                 ramped_value_step(&delay_frac)
             }
 
-            // fdn_in_sample := output_buffers[0][index]
-            fdn_in_sampleL := output_buffers[0][index]
-            fdn_in_sampleR := output_buffers[1][index]
+            // fdn_in_sample := output_bufferL[index]
+            fdn_in_sampleL := output_bufferL[index]
+            fdn_in_sampleR := output_bufferR[index]
             
             
             for channel in 0..<FDN_ORDER {
@@ -434,8 +439,8 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
                 delay_outputs[channel] = delay_line_read_sample_lagrange(reverb.late.delay_lines[channel], read_index_frac)
             }
             
-            output_buffers[0][index] += delay_outputs[0]
-            output_buffers[1][index] += delay_outputs[1]
+            output_bufferL[index] += delay_outputs[0]
+            output_bufferR[index] += delay_outputs[1]
             
             slice.zero(mixing_outputs[:])
             
@@ -448,12 +453,10 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
             }            
             
             for channel in 0..<FDN_ORDER {
-                delay_in := biquad_process_sample(reverb.late.lp_filters[channel], reverb.late.lp_state[channel][:], mixing_outputs[channel])
+                delay_in := biquad_process_sample(reverb.late.lp_filter, reverb.late.lp_state[channel][:], mixing_outputs[channel])
             
                 delay_in *= feedback
-                delay_in += (channel == 0 ? fdn_in_sampleL 
-                           : channel == 1 ? fdn_in_sampleR 
-                           : 0.0)
+                delay_in += fdn_in_sampleL + fdn_in_sampleR
                            
                 delay_line_push_sample(&reverb.late.delay_lines[channel], delay_in)
             }
@@ -461,8 +464,8 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     }
 
     for index in 0..<nsamples {
-        bufferL[index] = math.lerp(bufferL[index], output_buffers[0][index], reverb.mix)
-        bufferR[index] = math.lerp(bufferR[index], output_buffers[1][index], reverb.mix)
+        bufferL[index] = math.lerp(bufferL[index], output_bufferL[index], reverb.mix)
+        bufferR[index] = math.lerp(bufferR[index], output_bufferR[index], reverb.mix)
     }
     
     apply_gain_linear(bufferL, 0.5)    
@@ -735,8 +738,7 @@ biquad_process_sample :: #force_inline proc(f: Biquad, state: []f32, sample: f32
 }
 
 
-biquad_process :: proc(f: Biquad, state: []f32, buffer: []f32) {
-    
+biquad_process :: proc(f: Biquad, state: []f32, buffer: []f32) {   
     for index in 0..<len(buffer) {
         buffer[index] = biquad_process_sample(f, state, buffer[index])
     }
@@ -1084,7 +1086,7 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
         case win32.WM_SIZING: {
             edge := wParam
             rect := transmute(^win32.RECT)lParam
-        
+            win32.SetWindowPos(window, nil, rect.left, rect.top, rect.right, rect.bottom, 0)
         }
         case win32.WM_TIMER: {
             plugin_sync_audio_to_main(plugin)            
@@ -1097,27 +1099,27 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
                         
             io := imgui.GetIO()
             viewport := imgui.GetMainViewport()
-            position := viewport.WorkPos
+            // position := viewport.WorkPos
             size := viewport.WorkSize
             
-            next_pos: [4]int = {0, 0, 0, 0}
+            // imgui.PushItemWidth(int), imgui.PopItemWidth()
             {
                 imgui.SetNextWindowPos({0, 0})
                 imgui.SetNextWindowSize({size.x, size.y})
                 
                 open: bool = true
-                imgui.Begin("Mainwindow", &open, {.NoCollapse})
-
-                imgui.BeginChild("Volumes", {100, size.y})
-                make_vslider(plugin, .InGain, {20, 200})
-                imgui.SameLine()
-                make_vslider(plugin, .OutGain, {20, 200})
+                imgui.Begin("Mainwindow", &open, {.NoCollapse, .NoResize})
+                
+                gain_window_size : f32 = 60.0
+                imgui.BeginChild("Volumes", {500, gain_window_size})
+                make_hslider(plugin, .InGain)
+                // imgui.SameLine()
+                make_hslider(plugin, .OutGain)
                 imgui.EndChild()
-                
-                imgui.SameLine()
-                
-                imgui.BeginChild("Echo", {400, size.y})
+                                
+                imgui.BeginChild("Echo", {size.x/2, size.y-gain_window_size})
 
+                imgui.SeparatorText("Echo")
                 make_hslider(plugin, .EchoTime)
                 make_hslider(plugin, .EchoFeedback)
                 make_hslider(plugin, .EchoTone)
@@ -1129,8 +1131,9 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
                 
                 imgui.SameLine()                
         
-                imgui.BeginChild("Reverb", {400, size.y})
-        
+                imgui.BeginChild("Reverb", {size.x/2, size.y-gain_window_size})
+            
+                imgui.SeparatorText("Reverb")
                 make_hslider(plugin, .ReverbDecay)
                 make_hslider(plugin, .ReverbSize)
                 make_hslider(plugin, .ReverbEarlyDiffusion)
@@ -1138,8 +1141,17 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
                 make_hslider(plugin, .ReverbTone)
                 make_hslider(plugin, .ReverbMix)
 
-                if imgui.Button("Clear all buffers") {
-                    // clear all buffers
+                if imgui.Button("Clear reverb buffers") {
+                    
+                    for &ap in plugin.reverb.early.allpasses {
+                        slice.zero(ap.delay_line_outer.buffer)
+                        slice.zero(ap.delay_line_inner.buffer)
+                    }
+                    
+                    for &dl in plugin.reverb.late.delay_lines {
+                        slice.zero(dl.buffer)
+                    }
+                    
                 }
                 
                 imgui.EndChild()                
@@ -1184,8 +1196,8 @@ create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) 
     gui.window_class.style = win32.CS_OWNDC | win32.CS_DBLCLKS
     win32.RegisterClassW(&gui.window_class)
     
-    gui.width = 1000
-    gui.height = 400
+    gui.width = 1200
+    gui.height = 600
     gui.window = win32.CreateWindowW(gui.window_class.lpszClassName, 
                                     PLUGIN_NAME, 
                                     win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_CLIPSIBLINGS, 
@@ -1485,8 +1497,8 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
             delay_time := ms_to_samples_frac(fdn_delays_ms[channel] * plugin.audio_param_values[.ReverbSize], plugin.samplerate)
             ramped_value_init(&reverb.late.delays_frac[channel], delay_time, 0, allocator)
             
-            make_lowpass1(&reverb.late.lp_filters[channel], plugin.audio_param_values[.ReverbTone], plugin.samplerate)
         }
+        make_lowpass1(&reverb.late.lp_filter, plugin.audio_param_values[.ReverbTone], plugin.samplerate)
         
         mem.zero(&reverb.late.lp_state, len(&reverb.late.lp_state) * len(&reverb.late.lp_state[0]) * size_of(f32))
         
@@ -1603,9 +1615,7 @@ handle_parameter_change :: proc(plugin: ^PluginData, param_index: ParamIDs, valu
         case .ReverbEarlyDiffusion: {}
         case .ReverbLateDiffusion: {}
         case .ReverbTone: {
-            for &filter in plugin.reverb.late.lp_filters {
-                make_lowpass1(&filter, value, plugin.samplerate)
-            }
+            make_lowpass1(&plugin.reverb.late.lp_filter, value, plugin.samplerate)
         }
         case .ReverbMix: {
             plugin.reverb.mix = value
