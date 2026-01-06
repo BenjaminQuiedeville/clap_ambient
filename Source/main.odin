@@ -386,7 +386,10 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     output_bufferL   := reverb.output_buffers[0][:nsamples]
     output_bufferR   := reverb.output_buffers[1][:nsamples]
     
-
+    // refaire les diffuseurs d'entrée avec la méthode de signalsmith
+    // 4 channels : delays paralleles : matrice de mix (hadamard ?)  -> 4 étages
+    // désactiver les étages en fonctions de la diffusion souhaitée
+    
     copy(reverb_early_buf, bufferL)    
     allpass2_process_buffer(&reverb.early.allpasses[0], reverb_early_buf)
     allpass2_process_buffer(&reverb.early.allpasses[1], reverb_early_buf)
@@ -397,20 +400,19 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     allpass2_process_buffer(&reverb.early.allpasses[2], reverb_early_buf)
     allpass2_process_buffer(&reverb.early.allpasses[3], reverb_early_buf)
     copy(output_bufferR, reverb_early_buf)
-    
 
     { //late  
     // screams SIMD
-        @static feedback_matrix := [FDN_ORDER][FDN_ORDER]f32 { {1,  1,  1,  1,  1,  1,  1,  1},
-                                                               {1, -1,  1, -1,  1, -1,  1, -1},
-                                                               {1,  1, -1, -1,  1,  1, -1, -1},
-                                                               {1, -1, -1,  1,  1, -1, -1,  1},
-                                                               {1,  1,  1,  1, -1, -1, -1, -1},
-                                                               {1, -1,  1, -1, -1,  1, -1,  1},
-                                                               {1,  1, -1, -1, -1, -1,  1,  1},
-                                                               {1, -1, -1,  1, -1,  1,  1, -1}, }
+        @static feedback_matrix := [FDN_ORDER][FDN_ORDER]f32 { { 1,   1,   1,   1,   1,   1,   1,   1 },
+                                                               { 1,  -1,   1,  -1,   1,  -1,   1,  -1 },
+                                                               { 1,   1,  -1,  -1,   1,   1,  -1,  -1 },
+                                                               { 1,  -1,  -1,   1,   1,  -1,  -1,   1 },
+                                                               { 1,   1,   1,   1,  -1,  -1,  -1,  -1 },
+                                                               { 1,  -1,   1,  -1,  -1,   1,  -1,   1 },
+                                                               { 1,   1,  -1,  -1,  -1,  -1,   1,   1 },
+                                                               { 1,  -1,  -1,   1,  -1,   1,   1,  -1 } }
 
-        mod_amount : f32 = 5.0
+        mod_amount : f32 = 20.0
         for channel in 0..<FDN_ORDER {
             lfo_fill_buffers(&reverb.late.lfos[channel], nsamples)
         }
@@ -456,7 +458,7 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
                 delay_in := biquad_process_sample(reverb.late.lp_filter, reverb.late.lp_state[channel][:], mixing_outputs[channel])
             
                 delay_in *= feedback
-                delay_in += fdn_in_sampleL + fdn_in_sampleR
+                delay_in += channel == 0 ? fdn_in_sampleL : channel == 1 ? fdn_in_sampleR : 0.0
                            
                 delay_line_push_sample(&reverb.late.delay_lines[channel], delay_in)
             }
@@ -1481,6 +1483,7 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         fdn_max_delay := ms_to_samples(300.0 * parameter_infos[.ReverbSize].max, plugin.samplerate)
         
         init_feedback := plugin.audio_param_values[.ReverbDecay]
+        init_feedback = scale(init_feedback, parameter_infos[.ReverbDecay].min, parameter_infos[.ReverbDecay].max, 0.0, 1.0, 0.3)
         ramped_value_init(&reverb.late.feedback, init_feedback, 0, allocator)
                           
         
