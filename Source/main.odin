@@ -158,9 +158,21 @@ apply_gain_linear :: #force_inline proc(buffer: []f32, gain: f32) {
     }
 }
 
+// dest += source
 add_buffers :: #force_inline proc(dest, source: []f32) {
+    assert(len(dest) == len(source))
+
     for &sample, index in dest {
         sample += source[index]
+    }
+}
+
+// dest += gain*source
+add_buffers_with_gain_linear :: #force_inline proc(dest, source: []f32, gain: f32) {
+    assert(len(dest) == len(source)) 
+    
+    for &sample, index in dest {
+        sample += gain*source[index]
     }
 }
 
@@ -266,6 +278,18 @@ DelayLine :: struct {
     write_index: u32,
 }
 
+delay_line_process_buffer_lagrange :: proc(dl: ^DelayLine, in_buffer, out_buffer: []f32, delay_frac: f32) {
+
+    for &out_sample, sample_index in out_buffer {
+    
+        read_index_frac := f64(dl.write_index) - f64(delay_frac)        
+        out_sample = delay_line_read_sample_lagrange(dl^, f32(read_index_frac)) 
+        
+        delay_line_push_sample(dl, in_buffer[sample_index])
+    }
+}
+
+
 delay_line_push_sample :: #force_inline proc(dl: ^DelayLine, sample: f32) {
     dl.buffer[dl.write_index] = sample
     dl.write_index += 1
@@ -331,23 +355,47 @@ delay_line_read_sample_linear :: proc(dl: DelayLine, read_position: f32) -> f32 
 }
 
 FDN_ORDER :: 8
-@rodata fdn_delays_ms := [FDN_ORDER]f32{ 12.723904, 50.03751, 64.207954, 108.86561, 130.90741, 173.62048, 188.95348, 217.13364 }
+// @rodata fdn_delays_ms := [FDN_ORDER]f32{ 12.723904, 50.03751, 64.207954, 108.86561, 130.90741, 173.62048, 188.95348, 217.13364 }
+@rodata fdn_delays_ms := [FDN_ORDER]f32{ 47.871395, 52.17798, 54.59097, 53.903305, 51.67211, 54.251995, 51.666626, 52.31113 }
+
+@rodata hadamard4 := [4][4]f32 { { 1,   1,   1,   1},
+                                 { 1,  -1,   1,  -1},
+                                 { 1,   1,  -1,  -1},
+                                 { 1,  -1,  -1,   1} }
+
+@rodata hadamard8 := [8][8]f32 { { 1,   1,   1,   1,   1,   1,   1,   1 },
+                                 { 1,  -1,   1,  -1,   1,  -1,   1,  -1 },
+                                 { 1,   1,  -1,  -1,   1,   1,  -1,  -1 },
+                                 { 1,  -1,  -1,   1,   1,  -1,  -1,   1 },
+                                 { 1,   1,   1,   1,  -1,  -1,  -1,  -1 },
+                                 { 1,  -1,   1,  -1,  -1,   1,  -1,   1 },
+                                 { 1,   1,  -1,  -1,  -1,  -1,   1,   1 },
+                                 { 1,  -1,  -1,   1,  -1,   1,   1,  -1 } }
+
+hadamard4_mix_buffers :: proc(inputs, outputs: [4][]f32) {
+
+    for out_buffer, out_index in outputs {
+        slice.zero(out_buffer)        
+        
+        for in_buffer, in_index in inputs {    
+            gain := hadamard4[out_index][in_index] * 0.5
+            
+            for &sample, index in out_buffer {
+                sample += gain * in_buffer[index]
+            }
+        }
+    }
+}
 
 Reverb :: struct {
-    // faire 4 allpass et un FDN4 pour commencer
-    // @TODO tester la chaine de allpass (prendre les valeurs de la progenitor)
-    // APRES, commencer à construire un FDN4 PUIS un FDN16
-    // expérimenter avec différentes formes de allpass (ordre 2, multitap...)
+
+    in_lp: Biquad,
+    lp_state: [2]f32,
     
-    early: struct {
-        allpasses: [4]AllpassDelay2,
-        
-        in_lp: Biquad,
-        lp_state: [2]f32,
-        
-        in_hp: Biquad,
-        hp_state: [2]f32,
-    },
+    in_hp: Biquad,
+    hp_state: [2]f32,        
+    
+    diffusors: [2]DiffusorStage,
     
     late: struct {
         delay_lines: [FDN_ORDER]DelayLine,
@@ -368,6 +416,12 @@ Reverb :: struct {
     mix: f32,
 }
 
+DiffusorStage :: struct {
+    delay_lines: [4]DelayLine,
+    allpasses: [4]AllpassDelay,
+    delays_frac: [4]f32,
+}
+
 //github.com/Signalsmith-Audio/reverb-example-code/blob/main/reverb-example-code.h
 reverb_compute_feedback :: proc(rt60: f32, max_delay_ms: f32) -> f32 {    
     loops_per_rt60 := rt60/(max_delay_ms * 0.001 * 1.5)
@@ -380,7 +434,7 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     
     //early stages
     nsamples := u32(len(bufferL))
-        
+    
     reverb_input_buf := reverb.input_buffer[:nsamples]
     reverb_early_buf := reverb.early_stage_buffer[:nsamples]
     output_bufferL   := reverb.output_buffers[0][:nsamples]
@@ -390,28 +444,57 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     // 4 channels : delays paralleles : matrice de mix (hadamard ?)  -> 4 étages
     // désactiver les étages en fonctions de la diffusion souhaitée
     
-    copy(reverb_early_buf, bufferL)    
-    allpass2_process_buffer(&reverb.early.allpasses[0], reverb_early_buf)
-    allpass2_process_buffer(&reverb.early.allpasses[1], reverb_early_buf)
-    copy(output_bufferL, reverb_early_buf)
-    
+    diff_delay_outputs: [4][]f32 = { make([]f32, nsamples, context.temp_allocator),
+                                     make([]f32, nsamples, context.temp_allocator),
+                                     make([]f32, nsamples, context.temp_allocator),
+                                     make([]f32, nsamples, context.temp_allocator) }
 
-    copy(reverb_early_buf, bufferR)
-    allpass2_process_buffer(&reverb.early.allpasses[2], reverb_early_buf)
-    allpass2_process_buffer(&reverb.early.allpasses[3], reverb_early_buf)
-    copy(output_bufferR, reverb_early_buf)
+    diff_mix_outputs: [4][]f32 = { make([]f32, nsamples, context.temp_allocator),
+                                   make([]f32, nsamples, context.temp_allocator),
+                                   make([]f32, nsamples, context.temp_allocator),
+                                   make([]f32, nsamples, context.temp_allocator) }
+
+    diff_ap_outputs: [4][]f32 = { make([]f32, nsamples, context.temp_allocator),
+                                  make([]f32, nsamples, context.temp_allocator),
+                                  make([]f32, nsamples, context.temp_allocator),
+                                  make([]f32, nsamples, context.temp_allocator) }
+        
+    { // early
+        
+        delay_line_process_buffer_lagrange(&reverb.diffusors[0].delay_lines[0], bufferL, diff_delay_outputs[0], reverb.diffusors[0].delays_frac[0])
+        delay_line_process_buffer_lagrange(&reverb.diffusors[0].delay_lines[1], bufferR, diff_delay_outputs[1], reverb.diffusors[0].delays_frac[1])
+        delay_line_process_buffer_lagrange(&reverb.diffusors[0].delay_lines[2], bufferL, diff_delay_outputs[2], reverb.diffusors[0].delays_frac[2])
+        delay_line_process_buffer_lagrange(&reverb.diffusors[0].delay_lines[3], bufferR, diff_delay_outputs[3], reverb.diffusors[0].delays_frac[3])
+
+        for &ap, index in reverb.diffusors[0].allpasses {
+            allpass_process_buffer(&ap, diff_delay_outputs[index], diff_ap_outputs[index])
+        }
+
+        hadamard4_mix_buffers(diff_ap_outputs, diff_mix_outputs)
+
+
+        
+        for &dl, index in reverb.diffusors[1].delay_lines {
+            delay_line_process_buffer_lagrange(&dl, diff_mix_outputs[index], diff_delay_outputs[index], reverb.diffusors[1].delays_frac[index])
+        }
+
+        // for &ap, index in reverb.diffusors[1].allpasses {
+        //     allpass_process_buffer(&ap, diff_delay_outputs[index], diff_ap_outputs[index])
+        // }
+        
+        hadamard4_mix_buffers(diff_delay_outputs, diff_mix_outputs)
+    }
+
+    slice.zero(output_bufferL)    
+    slice.zero(output_bufferR)    
+    
+    add_buffers_with_gain_linear(output_bufferL, diff_mix_outputs[0], 0.25)
+    add_buffers_with_gain_linear(output_bufferL, diff_mix_outputs[1], 0.25)
+    add_buffers_with_gain_linear(output_bufferR, diff_mix_outputs[2], 0.25)
+    add_buffers_with_gain_linear(output_bufferR, diff_mix_outputs[3], 0.25)
 
     { //late  
     // screams SIMD
-        @static feedback_matrix := [FDN_ORDER][FDN_ORDER]f32 { { 1,   1,   1,   1,   1,   1,   1,   1 },
-                                                               { 1,  -1,   1,  -1,   1,  -1,   1,  -1 },
-                                                               { 1,   1,  -1,  -1,   1,   1,  -1,  -1 },
-                                                               { 1,  -1,  -1,   1,   1,  -1,  -1,   1 },
-                                                               { 1,   1,   1,   1,  -1,  -1,  -1,  -1 },
-                                                               { 1,  -1,   1,  -1,  -1,   1,  -1,   1 },
-                                                               { 1,   1,  -1,  -1,  -1,  -1,   1,   1 },
-                                                               { 1,  -1,  -1,   1,  -1,   1,   1,  -1 } }
-
         mod_amount : f32 = 20.0
         for channel in 0..<FDN_ORDER {
             lfo_fill_buffers(&reverb.late.lfos[channel], nsamples)
@@ -428,10 +511,10 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
                 ramped_value_step(&delay_frac)
             }
 
-            // fdn_in_sample := output_bufferL[index]
-            fdn_in_sampleL := output_bufferL[index]
-            fdn_in_sampleR := output_bufferR[index]
-            
+            fdn_ins: [4]f32 = {diff_mix_outputs[0][index], 
+                               diff_mix_outputs[1][index], 
+                               diff_mix_outputs[2][index], 
+                               diff_mix_outputs[3][index]}            
             
             for channel in 0..<FDN_ORDER {
                 read_index_frac := (f32(reverb.late.delay_lines[channel].write_index) 
@@ -449,7 +532,7 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
             mixing_gain : f32 : 0.35355339059327373
             for channel in 0..<FDN_ORDER {
                 for matrix_index in 0..<FDN_ORDER {
-                    mixing_outputs[channel] += delay_outputs[matrix_index]*feedback_matrix[channel][matrix_index]
+                    mixing_outputs[channel] += delay_outputs[matrix_index]*hadamard8[channel][matrix_index]
                 }
                 mixing_outputs[channel] *= mixing_gain
             }            
@@ -457,8 +540,8 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
             for channel in 0..<FDN_ORDER {
                 delay_in := biquad_process_sample(reverb.late.lp_filter, reverb.late.lp_state[channel][:], mixing_outputs[channel])
             
-                delay_in *= feedback
-                delay_in += channel == 0 ? fdn_in_sampleL : channel == 1 ? fdn_in_sampleR : 0.0
+                delay_in *= feedback                
+                delay_in += fdn_ins[channel & 3]
                            
                 delay_line_push_sample(&reverb.late.delay_lines[channel], delay_in)
             }
@@ -473,8 +556,6 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
     apply_gain_linear(bufferL, 0.5)    
     apply_gain_linear(bufferR, 0.5)    
 }
-
-ProgenitorReverb :: struct {}
 
 
 Echo :: struct {
@@ -761,10 +842,11 @@ allpass_init :: proc(allpass: ^AllpassDelay, buffer_size: u32, init_delay_frac, 
     allpass.gain = init_gain
 }
 
-allpass_process_buffer :: proc(ap: ^AllpassDelay, buffer: []f32) {
+allpass_process_buffer :: proc(ap: ^AllpassDelay, in_buffer, out_buffer: []f32) {
+    assert(len(in_buffer) == len(out_buffer))
     
-    for &sample in buffer {
-        sample = allpass_process_sample(ap, sample)
+    for &sample, index in out_buffer {
+        sample = allpass_process_sample(ap, in_buffer[index])
     }
 }
 
@@ -813,9 +895,11 @@ allpass2_init :: proc(allpass: ^AllpassDelay2,
 }
 
 
-allpass2_process_buffer :: proc(ap: ^AllpassDelay2, buffer: []f32) {
-    for &sample in buffer {
-        sample = allpass2_process_sample(ap, sample)
+allpass2_process_buffer :: proc(ap: ^AllpassDelay2, in_buffer, out_buffer: []f32) {
+    assert(len(in_buffer) == len(out_buffer))
+    
+    for &sample, index in out_buffer {
+        sample = allpass2_process_sample(ap, in_buffer[index])
     }
 }
 
@@ -1138,17 +1222,17 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
                 imgui.SeparatorText("Reverb")
                 make_hslider(plugin, .ReverbDecay)
                 make_hslider(plugin, .ReverbSize)
-                make_hslider(plugin, .ReverbEarlyDiffusion)
-                make_hslider(plugin, .ReverbLateDiffusion)
+                // make_hslider(plugin, .ReverbEarlyDiffusion)
+                // make_hslider(plugin, .ReverbLateDiffusion)
                 make_hslider(plugin, .ReverbTone)
                 make_hslider(plugin, .ReverbMix)
 
                 if imgui.Button("Clear reverb buffers") {
                     
-                    for &ap in plugin.reverb.early.allpasses {
-                        slice.zero(ap.delay_line_outer.buffer)
-                        slice.zero(ap.delay_line_inner.buffer)
-                    }
+                    // for &ap in plugin.reverb.early.allpasses {
+                    //     slice.zero(ap.delay_line_outer.buffer)
+                    //     slice.zero(ap.delay_line_inner.buffer)
+                    // }
                     
                     for &dl in plugin.reverb.late.delay_lines {
                         slice.zero(dl.buffer)
@@ -1461,24 +1545,38 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
         
         error := vmem.arena_init_growing(&plugin.reverb_arena, 4*mem.Megabyte)
         ensure(error == nil)
-        allocator := vmem.arena_allocator(&plugin.reverb_arena)
-        
-        early_allpass_alloc_size := ms_to_samples(50.0, plugin.samplerate)
-        
-        early_times_outer := [4]f32{7.56, 21.73, 8.50, 33.07}
-        early_times_inner := [4]f32{17.01, 37.84, 21.73, 39.69}
-        
-        early_gains_outer := [4]f32{0.7, 0.4, 0.7, 0.4}
-        early_gains_inner := [4]f32{0.5, 0.4, 0.5, 0.4}
-                        
-        for &allpass, index in reverb.early.allpasses {
-            allpass2_init(&allpass, early_allpass_alloc_size, early_allpass_alloc_size,
-                            ms_to_samples_frac(early_times_outer[index], plugin.samplerate), 
-                            ms_to_samples_frac(early_times_inner[index], plugin.samplerate),
-                            early_gains_outer[index],
-                            early_gains_inner[index],
-                            allocator)
+        allocator := vmem.arena_allocator(&plugin.reverb_arena)    
+
+        reverb.diffusors[0].delays_frac[0] = ms_to_samples_frac(4.5317416, plugin.samplerate)
+        reverb.diffusors[0].delays_frac[1] = ms_to_samples_frac(6.241636, plugin.samplerate)
+        reverb.diffusors[0].delays_frac[2] = ms_to_samples_frac(9.245789, plugin.samplerate)
+        reverb.diffusors[0].delays_frac[3] = ms_to_samples_frac(28.552198, plugin.samplerate)         
+                 
+        for &dl in reverb.diffusors[0].delay_lines {
+            dl.buffer = make([]f32, ms_to_samples(30.0, plugin.samplerate), allocator)
         }
+
+        allpass_init(&reverb.diffusors[0].allpasses[0], cast(u32)ms_to_samples(20.0, plugin.samplerate), ms_to_samples_frac(5.32, plugin.samplerate), 0.4, allocator)
+        allpass_init(&reverb.diffusors[0].allpasses[1], cast(u32)ms_to_samples(20.0, plugin.samplerate), ms_to_samples_frac(9.13, plugin.samplerate), 0.4, allocator)
+        allpass_init(&reverb.diffusors[0].allpasses[2], cast(u32)ms_to_samples(20.0, plugin.samplerate), ms_to_samples_frac(13.7, plugin.samplerate), 0.4, allocator)
+        allpass_init(&reverb.diffusors[0].allpasses[3], cast(u32)ms_to_samples(20.0, plugin.samplerate), ms_to_samples_frac(17.9, plugin.samplerate), 0.4, allocator)
+
+
+
+        reverb.diffusors[1].delays_frac[0] = ms_to_samples_frac(8.781754, plugin.samplerate)
+        reverb.diffusors[1].delays_frac[1] = ms_to_samples_frac(15.445027, plugin.samplerate)
+        reverb.diffusors[1].delays_frac[2] = ms_to_samples_frac(22.079914, plugin.samplerate)
+        reverb.diffusors[1].delays_frac[3] = ms_to_samples_frac(47.052425, plugin.samplerate)
+                
+        for &dl in reverb.diffusors[1].delay_lines {
+            dl.buffer = make([]f32, ms_to_samples(60.0, plugin.samplerate), allocator)
+        }
+
+        allpass_init(&reverb.diffusors[1].allpasses[0], cast(u32)ms_to_samples(40.0, plugin.samplerate), ms_to_samples_frac(11.52, plugin.samplerate), 0.4, allocator)
+        allpass_init(&reverb.diffusors[1].allpasses[1], cast(u32)ms_to_samples(40.0, plugin.samplerate), ms_to_samples_frac(19.3, plugin.samplerate), 0.4, allocator)
+        allpass_init(&reverb.diffusors[1].allpasses[2], cast(u32)ms_to_samples(40.0, plugin.samplerate), ms_to_samples_frac(25.7, plugin.samplerate), 0.4, allocator)
+        allpass_init(&reverb.diffusors[1].allpasses[3], cast(u32)ms_to_samples(40.0, plugin.samplerate), ms_to_samples_frac(38.9, plugin.samplerate), 0.4, allocator)
+        
         
         fdn_max_delay := ms_to_samples(300.0 * parameter_infos[.ReverbSize].max, plugin.samplerate)
         
@@ -1770,7 +1868,8 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
         
         current_frame_index = next_event_frame
     }
-    
+
+    free_all(context.temp_allocator)    
     return .CONTINUE
 }
 
