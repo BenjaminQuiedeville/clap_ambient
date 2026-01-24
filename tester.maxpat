@@ -4,14 +4,114 @@
         "appversion": {
             "major": 9,
             "minor": 1,
-            "revision": 0,
+            "revision": 2,
             "architecture": "x64",
             "modernui": 1
         },
         "classnamespace": "box",
-        "rect": [ 34.0, 77.0, 1493.0, 939.0 ],
+        "rect": [ 34.0, 77.0, 1852.0, 939.0 ],
         "subpatcher_template": "empty_mixer",
         "boxes": [
+            {
+                "box": {
+                    "autosave": 1,
+                    "bgmode": 0,
+                    "border": 0,
+                    "clickthrough": 0,
+                    "id": "obj-8",
+                    "maxclass": "newobj",
+                    "numinlets": 2,
+                    "numoutlets": 8,
+                    "offset": [ 0.0, 0.0 ],
+                    "outlettype": [ "signal", "signal", "", "list", "int", "", "", "" ],
+                    "patching_rect": [ 77.0, 255.0, 300.0, 100.0 ],
+                    "save": [ "#N", "vst~", "loaduniqueid", 0, "C74_VST3:/AmpModeler", ";" ],
+                    "saved_attribute_attributes": {
+                        "valueof": {
+                            "parameter_invisible": 1,
+                            "parameter_longname": "vst~[1]",
+                            "parameter_modmode": 0,
+                            "parameter_shortname": "vst~[1]",
+                            "parameter_type": 3
+                        }
+                    },
+                    "saved_object_attributes": {
+                        "parameter_enable": 1,
+                        "parameter_mappable": 0
+                    },
+                    "snapshot": {
+                        "filetype": "C74Snapshot",
+                        "version": 2,
+                        "minorversion": 0,
+                        "name": "snapshotlist",
+                        "origin": "vst~",
+                        "type": "list",
+                        "subtype": "Undefined",
+                        "embed": 1,
+                        "snapshot": {
+                            "pluginname": "AmpModeler.vst3info",
+                            "plugindisplayname": "AmpModeler",
+                            "pluginsavedname": "",
+                            "pluginsaveduniqueid": -1908487325,
+                            "version": 1,
+                            "isbank": 0,
+                            "isbase64": 1,
+                            "sliderorder": [],
+                            "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ],
+                            "blob": "3713.VMjLgfmC...O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9HyMv.iKPUDahcFLwHlKt.kK23RUPIUQTMkKDYlKuEkQtDjcPEjPIUkTGcFQUUVSTAETAY1XmcmUisVPP4RRP4hKt3hKt3hKtbyJt3BUAkTUP0TPP4hPpYTVtPDTBUDSDIUPzn1TEcGQtDSQFEFLUYjKAolKA4hKt3hKt3hKH4BQt.UQpQUPvPjKAgDTZoVPP4BTTYGTHUjZS4TUDMUYMo2TNkEURcTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKt3hKtPUPIUETMEDTtHjZFkkKDYmPEQEUTUVQ5AEUqoVUEEjYic1cVM1ZAAkKIAkKt3hKt3hKt3xMq3hKTETRUAUSAAkKBolQY4BQPMTQhQETTUkdWETSDUURYUUTtf0UXIWUWkkKDAkPD4hKt3hKt3hKtrxSt3RUPIUQTMkKDYlKuEkQtDjdPEzQEQTUEgSUPQUTUA0PyQjKwTjQgASUF4RPp4RPt3hKt3hKt3hcqLjKPUjZTEDLD4RPHAkVpEDTt3DU1EUPQUUTkkTUQwTUTA0TUQjKwTjQgASUF4RPp4RPt3hKt3hKt3BctPjKPUjZTEDLD4RPHAkVpEDTtzDU1EUPQUUTkkTUQQUUqQkSAY1XmcmUisVPP4RRP4hKt3hKt3hKt3hKt3BUAkTUP0TPP4hPpYTVtPDTCUjXTAEUUo2UTclZTUTSEIkKXcEVxU0UY4BQPIDQt3hKt3hKt3xREYmKtTETRUDUS4BQl4xaQYjKAcCTAgzZ5EER3.CTUEELWYTRUEUTAY1XmcmUisVPP4RRP4hKt3hKt3hYynmKA4BUAkTUP0TPP4hPpYTVtPjcBUjYTI0Qmo2UFkTUQEUPlM1Y2Y0XqEDTtjDTt3hKt3BRt3hds4RPtPUPIUETMEDTtHjZFkkKDYmPEYFURczY5c0QEQkTNEjYic1cVM1ZAAkKIAkKt3hKt3hKt3hKt3hKTETRUAUSAAkKBolQY4BQtHTQlQkTGcldWEUPlM1Y2Y0XqEDTtjDTt3hKt3xLqrxJxrhKtPUPIUETMEDTtHjZFkkKDAEQEYFURczY5c0TmQUTLkkdWYTRUEUTAY1XmcmUisVPP4RRP4hKt3hKt3hYynmKA4BUAkTUP0TPP4hPpYTVtPDTDUjYTI0Qmo2UScFUQwTV5c0QEQkTNEjYic1cVM1ZAAkKIAkKt3hKt3hKt3hKt3hKTETRUAUSAAkKBolQY4BQlMTQpo1TPUUQUUVVTIESQUUTREjYic1cVM1ZAAkKIAkKt3hKtLyJq7jUtDjKTETRUAUSAAkKBolQY4BQtLTQpo1TPUUQUU1XTAURzPjKwTjQgASUF4RPp4RPt3hKt3hKt3hKt3hKPUjZTEDLD4RPHAkVpEDTtrDUPIkT3TETCEUURYUUD4RLEYTXvTkQtDjZtDjKt3hKt3hKtX2JC4BTEoFUAACQtDDRPokZAAkKMQkKS8zXUMURQo2UFkTUQEUPlM1Y2Y0XqEDTtjDTt3hKt3BRt3BTZ4RPtPUPIUETMEDTtHjZFkkKDA0PEYmdScELTIEQ3.STAslZS4BVWgkbUcUVtPDTBQjKt3hKt3hKt3hKt3hKUAkTEQ0TtPjYt7VTF4RPtAUPLgidU0zZDEUYEUjKwTjQgASUF4RPp4RPt3hKtX1JqrRYqLjKPUjZTEDLD4RPHAkVpEDTt3DUtL0SiAyUCUUQUUVVpQUQEUjKwTjQgASUF4RPp4RPt3hKt3hKt3hZtPjKPUjZTEDLD4RPHAkVpEDTt.EUtL0SiAyUScFUQwTV5ckQIUUTQEjYic1cVM1ZAAkKIAkKt3hKt3hKt3RRtDjKTETRUAUSAAkKBolQY4BQtPTQ1o2TWgCLTgTUDMkQ3.STAslZS4BVWgkbUcUVtPDTBQjKt3hKt3hKt3hKt3hKUAkTEQ0TtPjYt7VTF4RP2.UPMUjdTQUUpQUYYAyTLUUUSUTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKt3hKtPUPIUETMEDTtHjZFkkKDYlPEoGURQDNqEkTUQEUtf0UXIWUWkkKDAkPD4hKt3hKt3hYWgDTt3RUPIUQTMkKDYlKuEkQtDjaPETSqQTTkMFUPkDMD4RLEYTXvTkQtDjZtDjKt3hKt3hKt3hKt3BTEoFUAACQtDDRPokZAAkKGQETSkTT5cUTAY1XmcmUisVPP4RRP4hKt3hKyrxJqHyJt3BUAkTUP0TPP4hPpYTVtPjcCUjKqQUQEQ0TPgSUPMTTUIkUUQjKwTjQgASUF4RPp4RPt3hKt3hKt3hcqLjKPUjZTEDLD4RPHAkVpEDTtzDUtPkTUQETMEDLWcTQTIkSAY1XmcmUisVPP4RRP4hKt3hKt3hKtTjKA4BUAkTUP0TPP4hPpYTVtPjcCUjKqQUQEQ0TPgyZU8zcTUUSUQjKwTjQgASUF4RPp4RPt3hKt3hKt3hKt3hKPUjZTEDLD4RPHAkVpEDTtnDUtPkTUoGUEQidPUTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKE4RPtPUPIUETMEDTtHjZFkkKDYmPEgTUQMENpMUPznGTEEjYic1cVM1ZAAkKIAkKt3hKt3hKt3RQtDjKTETRUAUSAAkKBolQY4BQlMTQLACTEUDUSUTRvbkQIUUTQEjYic1cVM1ZAAkKIAkKt3hKt3hKtTzZtDjKTETRUAUSAAkKBolQY4BQPQTQLACTRUEUP0TUpQUYEQ0TOU0ZSQUPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKt3hKtPUPIUETMEDTtHjZFkkKDA0PEwTQUEzXTEkc2rFTIUjdT4BVWgkbUcUVtPDTBQjKt3hKt3hKt3hKt3hKUAkTEQ0TtPjYt7VTF4RP2.UPSEUUPcTUDwTYIQkUPUjdTMUPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKE4xPtPUPIUETMEDTtHjZFkkKDYmPEwTQUEzXTEkc2TzTPEjYic1cVM1ZAAkKIAkKt3hKt3hKtHyctDjKTETRUAUSAAkKBolQY4BQtTTQLUTUAMFUQc2MUAEUQUUTNUUUPQ0Z5MkSAY1XmcmUisVPP4RRP4hKt3hK1wTdLYyJt3BUAkTUP0TPP4hPpYTVtPDTCUDSEUUPiQUT2cyZPkTQ5QkKXcEVxU0UY4BQPIDQt3hKt3BVrkEa27jKtTETRUDUS4BQl4xaQYjKAcCTAMUTUA0QUQESkkDUVAUQ5Q0TAY1XmcmUisVPP4RRP4hKt3hKt3hKtPjKC4BUAkTUP0TPP4hPpYTVtPjcBUDSEUUPiQUT2cSQSAUPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hL24RPtPUPIUETMEDTtHjZFkkKD4RQEwTQUEzXTEEd2TETTEUUQ4TUUAEUqo2TNEjYic1cVM1ZAAkKIAkKt3hKtfTdLk2Lq3hKTETRUAUSAAkKBolQY4BQPMTQLUTUAMFUQg2MqAUREoGUtf0UXIWUWkkKDAkPD4hKt3hK3wTdLgySt3RUPIUQTMkKDYlKuEkQtDzMPEzTQUETGUkZLUVRTYETEoGUSEjYic1cVM1ZAAkKIAkKt3hKt3hKt3hKt3hKTETRUAUSAAkKBolQY4BQ1ITQLUTUAMFUQg2MEMETAY1XmcmUisVPP4RRP4hKt3hKt3hKxbmKA4BUAkTUP0TPP4hPpYTVtPjKEUDSEUUPiQUT4cSUPQUTUEkSUUETTsldS4TPlM1Y2Y0XqEDTtjDTt3hKt3BR4wTdyrhKtPUPIUETMEDTtHjZFkkKDA0PEwTQUEzXTEUd2rFTIUjdT4BVWgkbUcUVtPDTBQjKt3hKt3hKt3hKt3hKUAkTEQ0TtPjYt7VTF4RP2.UPSEUUPcTU5wTYIQkUPUjdTMUPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKF4xPtPUPIUETMEDTtHjZFkkKDYmPEwTQUEzXTEUd2TzTPEjYic1cVM1ZAAkKIAkKt3hKt3hKtHyctDjKTETRUAUSAAkKBolQY4BQPMTQLUTUAMFUQo2MqAUREoGUtf0UXIWUWkkKDAkPD4hKt3hKt3hKt3hKt3RUPIUQTMkKDYlKuEkQtDzMPEzTQUETGUEQMUVRTYETEoGUSEjYic1cVM1ZAAkKIAkKt3hKt3hKt3hQtLjKTETRUAUSAAkKBolQY4BQ1ITQLUTUAMFUQo2MEMETAY1XmcmUisVPP4RRP4hKt3hKt3hKxbmKA4BUAkTUP0TPP4hPpYTVtPjcAUDTUI0QmQTUtf0UXIWUWkkKDAkPD4hKt3hKt3hKPIDTt3RUPIUQTMkKDYlKuEkQtDDRQEDU3n1TE0TQUETS5IUYEoGTTslZUUTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hK2rhKtPUPIUETMEDTtHjZFkkKDYmPEAELS4TU5ckPEoGUSEjYic1cVM1ZAAkKIAkKt3hKt3hKt3RQtDjKTETRUAUSAAkKBolQY4BQlITQPAyTNUkdW0zZDEkKXcEVxU0UY4BQPIDQt3hKt3hKt3BTAAkKtTETRUDUS4BQl4xaQYjKAYGTAQENpMUQ3T0TOEEUQwTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKt3hKtPUPIUETMEDTtHjZFkkKDYmPEAELS4TU5cEUIUUTBEjYic1cVM1ZAAkKIAkKt3hKt3hKt3RQtDDTRIENEQUPQUjTSEDTtHjZpQ0ct.kKBQkKtjTRqwjKDYlKE4hKt3hKt3hKt3hKt3hYRUUSTEETIckVwTjQisVTTgkdEYjKAQjYPQSPWgUdMcjKAQjct3hdA4hKt3hKt3hKtnTUv.UQAslXuk0UXoWUFE0YQcEV77RRC8Vav8lak4Fc9vyKVMEUy.Ea0cVZtMEcgQWY9.."
+                        },
+                        "snapshotlist": {
+                            "current_snapshot": 0,
+                            "entries": [
+                                {
+                                    "filetype": "C74Snapshot",
+                                    "version": 2,
+                                    "minorversion": 0,
+                                    "name": "AmpModeler",
+                                    "origin": "AmpModeler.vst3info",
+                                    "type": "VST3",
+                                    "subtype": "AudioEffect",
+                                    "embed": 0,
+                                    "snapshot": {
+                                        "pluginname": "AmpModeler.vst3info",
+                                        "plugindisplayname": "AmpModeler",
+                                        "pluginsavedname": "",
+                                        "pluginsaveduniqueid": -1908487325,
+                                        "version": 1,
+                                        "isbank": 0,
+                                        "isbase64": 1,
+                                        "sliderorder": [],
+                                        "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ],
+                                        "blob": "3713.VMjLgfmC...O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9HyMv.iKPUDahcFLwHlKt.kK23RUPIUQTMkKDYlKuEkQtDjcPEjPIUkTGcFQUUVSTAETAY1XmcmUisVPP4RRP4hKt3hKt3hKtbyJt3BUAkTUP0TPP4hPpYTVtPDTBUDSDIUPzn1TEcGQtDSQFEFLUYjKAolKA4hKt3hKt3hKH4BQt.UQpQUPvPjKAgDTZoVPP4BTTYGTHUjZS4TUDMUYMo2TNkEURcTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKt3hKtPUPIUETMEDTtHjZFkkKDYmPEQEUTUVQ5AEUqoVUEEjYic1cVM1ZAAkKIAkKt3hKt3hKt3xMq3hKTETRUAUSAAkKBolQY4BQPMTQhQETTUkdWETSDUURYUUTtf0UXIWUWkkKDAkPD4hKt3hKt3hKtrxSt3RUPIUQTMkKDYlKuEkQtDjdPEzQEQTUEgSUPQUTUA0PyQjKwTjQgASUF4RPp4RPt3hKt3hKt3hcqLjKPUjZTEDLD4RPHAkVpEDTt3DU1EUPQUUTkkTUQwTUTA0TUQjKwTjQgASUF4RPp4RPt3hKt3hKt3BctPjKPUjZTEDLD4RPHAkVpEDTtzDU1EUPQUUTkkTUQQUUqQkSAY1XmcmUisVPP4RRP4hKt3hKt3hKt3hKt3BUAkTUP0TPP4hPpYTVtPDTCUjXTAEUUo2UTclZTUTSEIkKXcEVxU0UY4BQPIDQt3hKt3hKt3xREYmKtTETRUDUS4BQl4xaQYjKAcCTAgzZ5EER3.CTUEELWYTRUEUTAY1XmcmUisVPP4RRP4hKt3hKt3hYynmKA4BUAkTUP0TPP4hPpYTVtPjcBUjYTI0Qmo2UFkTUQEUPlM1Y2Y0XqEDTtjDTt3hKt3BRt3hds4RPtPUPIUETMEDTtHjZFkkKDYmPEYFURczY5c0QEQkTNEjYic1cVM1ZAAkKIAkKt3hKt3hKt3hKt3hKTETRUAUSAAkKBolQY4BQtHTQlQkTGcldWEUPlM1Y2Y0XqEDTtjDTt3hKt3xLqrxJxrhKtPUPIUETMEDTtHjZFkkKDAEQEYFURczY5c0TmQUTLkkdWYTRUEUTAY1XmcmUisVPP4RRP4hKt3hKt3hYynmKA4BUAkTUP0TPP4hPpYTVtPDTDUjYTI0Qmo2UScFUQwTV5c0QEQkTNEjYic1cVM1ZAAkKIAkKt3hKt3hKt3hKt3hKTETRUAUSAAkKBolQY4BQlMTQpo1TPUUQUUVVTIESQUUTREjYic1cVM1ZAAkKIAkKt3hKtLyJq7jUtDjKTETRUAUSAAkKBolQY4BQtLTQpo1TPUUQUU1XTAURzPjKwTjQgASUF4RPp4RPt3hKt3hKt3hKt3hKPUjZTEDLD4RPHAkVpEDTtrDUPIkT3TETCEUURYUUD4RLEYTXvTkQtDjZtDjKt3hKt3hKtX2JC4BTEoFUAACQtDDRPokZAAkKMQkKS8zXUMURQo2UFkTUQEUPlM1Y2Y0XqEDTtjDTt3hKt3BRt3BTZ4RPtPUPIUETMEDTtHjZFkkKDA0PEYmdScELTIEQ3.STAslZS4BVWgkbUcUVtPDTBQjKt3hKt3hKt3hKt3hKUAkTEQ0TtPjYt7VTF4RPtAUPLgidU0zZDEUYEUjKwTjQgASUF4RPp4RPt3hKtX1JqrRYqLjKPUjZTEDLD4RPHAkVpEDTt3DUtL0SiAyUCUUQUUVVpQUQEUjKwTjQgASUF4RPp4RPt3hKt3hKt3hZtPjKPUjZTEDLD4RPHAkVpEDTt.EUtL0SiAyUScFUQwTV5ckQIUUTQEjYic1cVM1ZAAkKIAkKt3hKt3hKt3RRtDjKTETRUAUSAAkKBolQY4BQtPTQ1o2TWgCLTgTUDMkQ3.STAslZS4BVWgkbUcUVtPDTBQjKt3hKt3hKt3hKt3hKUAkTEQ0TtPjYt7VTF4RP2.UPMUjdTQUUpQUYYAyTLUUUSUTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKt3hKtPUPIUETMEDTtHjZFkkKDYlPEoGURQDNqEkTUQEUtf0UXIWUWkkKDAkPD4hKt3hKt3hYWgDTt3RUPIUQTMkKDYlKuEkQtDjaPETSqQTTkMFUPkDMD4RLEYTXvTkQtDjZtDjKt3hKt3hKt3hKt3BTEoFUAACQtDDRPokZAAkKGQETSkTT5cUTAY1XmcmUisVPP4RRP4hKt3hKyrxJqHyJt3BUAkTUP0TPP4hPpYTVtPjcCUjKqQUQEQ0TPgSUPMTTUIkUUQjKwTjQgASUF4RPp4RPt3hKt3hKt3hcqLjKPUjZTEDLD4RPHAkVpEDTtzDUtPkTUQETMEDLWcTQTIkSAY1XmcmUisVPP4RRP4hKt3hKt3hKtTjKA4BUAkTUP0TPP4hPpYTVtPjcCUjKqQUQEQ0TPgyZU8zcTUUSUQjKwTjQgASUF4RPp4RPt3hKt3hKt3hKt3hKPUjZTEDLD4RPHAkVpEDTtnDUtPkTUoGUEQidPUTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKE4RPtPUPIUETMEDTtHjZFkkKDYmPEgTUQMENpMUPznGTEEjYic1cVM1ZAAkKIAkKt3hKt3hKt3RQtDjKTETRUAUSAAkKBolQY4BQlMTQLACTEUDUSUTRvbkQIUUTQEjYic1cVM1ZAAkKIAkKt3hKt3hKtTzZtDjKTETRUAUSAAkKBolQY4BQPQTQLACTRUEUP0TUpQUYEQ0TOU0ZSQUPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKt3hKtPUPIUETMEDTtHjZFkkKDA0PEwTQUEzXTEkc2rFTIUjdT4BVWgkbUcUVtPDTBQjKt3hKt3hKt3hKt3hKUAkTEQ0TtPjYt7VTF4RP2.UPSEUUPcTUDwTYIQkUPUjdTMUPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKE4xPtPUPIUETMEDTtHjZFkkKDYmPEwTQUEzXTEkc2TzTPEjYic1cVM1ZAAkKIAkKt3hKt3hKtHyctDjKTETRUAUSAAkKBolQY4BQtTTQLUTUAMFUQc2MUAEUQUUTNUUUPQ0Z5MkSAY1XmcmUisVPP4RRP4hKt3hK1wTdLYyJt3BUAkTUP0TPP4hPpYTVtPDTCUDSEUUPiQUT2cyZPkTQ5QkKXcEVxU0UY4BQPIDQt3hKt3BVrkEa27jKtTETRUDUS4BQl4xaQYjKAcCTAMUTUA0QUQESkkDUVAUQ5Q0TAY1XmcmUisVPP4RRP4hKt3hKt3hKtPjKC4BUAkTUP0TPP4hPpYTVtPjcBUDSEUUPiQUT2cSQSAUPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hL24RPtPUPIUETMEDTtHjZFkkKD4RQEwTQUEzXTEEd2TETTEUUQ4TUUAEUqo2TNEjYic1cVM1ZAAkKIAkKt3hKtfTdLk2Lq3hKTETRUAUSAAkKBolQY4BQPMTQLUTUAMFUQg2MqAUREoGUtf0UXIWUWkkKDAkPD4hKt3hK3wTdLgySt3RUPIUQTMkKDYlKuEkQtDzMPEzTQUETGUkZLUVRTYETEoGUSEjYic1cVM1ZAAkKIAkKt3hKt3hKt3hKt3hKTETRUAUSAAkKBolQY4BQ1ITQLUTUAMFUQg2MEMETAY1XmcmUisVPP4RRP4hKt3hKt3hKxbmKA4BUAkTUP0TPP4hPpYTVtPjKEUDSEUUPiQUT4cSUPQUTUEkSUUETTsldS4TPlM1Y2Y0XqEDTtjDTt3hKt3BR4wTdyrhKtPUPIUETMEDTtHjZFkkKDA0PEwTQUEzXTEUd2rFTIUjdT4BVWgkbUcUVtPDTBQjKt3hKt3hKt3hKt3hKUAkTEQ0TtPjYt7VTF4RP2.UPSEUUPcTU5wTYIQkUPUjdTMUPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKF4xPtPUPIUETMEDTtHjZFkkKDYmPEwTQUEzXTEUd2TzTPEjYic1cVM1ZAAkKIAkKt3hKt3hKtHyctDjKTETRUAUSAAkKBolQY4BQPMTQLUTUAMFUQo2MqAUREoGUtf0UXIWUWkkKDAkPD4hKt3hKt3hKt3hKt3RUPIUQTMkKDYlKuEkQtDzMPEzTQUETGUEQMUVRTYETEoGUSEjYic1cVM1ZAAkKIAkKt3hKt3hKt3hQtLjKTETRUAUSAAkKBolQY4BQ1ITQLUTUAMFUQo2MEMETAY1XmcmUisVPP4RRP4hKt3hKt3hKxbmKA4BUAkTUP0TPP4hPpYTVtPjcAUDTUI0QmQTUtf0UXIWUWkkKDAkPD4hKt3hKt3hKPIDTt3RUPIUQTMkKDYlKuEkQtDDRQEDU3n1TE0TQUETS5IUYEoGTTslZUUTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hK2rhKtPUPIUETMEDTtHjZFkkKDYmPEAELS4TU5ckPEoGUSEjYic1cVM1ZAAkKIAkKt3hKt3hKt3RQtDjKTETRUAUSAAkKBolQY4BQlITQPAyTNUkdW0zZDEkKXcEVxU0UY4BQPIDQt3hKt3hKt3BTAAkKtTETRUDUS4BQl4xaQYjKAYGTAQENpMUQ3T0TOEEUQwTPlM1Y2Y0XqEDTtjDTt3hKt3hKt3hKt3hKtPUPIUETMEDTtHjZFkkKDYmPEAELS4TU5cEUIUUTBEjYic1cVM1ZAAkKIAkKt3hKt3hKt3RQtDDTRIENEQUPQUjTSEDTtHjZpQ0ct.kKBQkKtjTRqwjKDYlKE4hKt3hKt3hKt3hKt3hYRUUSTEETIckVwTjQisVTTgkdEYjKAQjYPQSPWgUdMcjKAQjct3hdA4hKt3hKt3hKtnTUv.UQAslXuk0UXoWUFE0YQcEV77RRC8Vav8lak4Fc9vyKVMEUy.Ea0cVZtMEcgQWY9.."
+                                    },
+                                    "fileref": {
+                                        "name": "AmpModeler",
+                                        "filename": "AmpModeler.maxsnap",
+                                        "filepath": "D:/Documents/Max 9/Snapshots",
+                                        "filepos": -1,
+                                        "snapshotfileid": "d89a206b6ff1ec2ee81d2b68a8a5f9ae"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "text": "vst~ C74_VST3:/AmpModeler",
+                    "varname": "vst~[1]",
+                    "viewvisibility": 1
+                }
+            },
+            {
+                "box": {
+                    "format": 6,
+                    "id": "obj-9",
+                    "maxclass": "flonum",
+                    "numinlets": 1,
+                    "numoutlets": 2,
+                    "outlettype": [ "", "bang" ],
+                    "parameter_enable": 0,
+                    "patching_rect": [ 1172.0, 227.0, 50.0, 22.0 ]
+                }
+            },
             {
                 "box": {
                     "id": "obj-7",
@@ -20,7 +120,7 @@
                     "numinlets": 2,
                     "numoutlets": 1,
                     "outlettype": [ "" ],
-                    "patching_rect": [ 369.0, 519.0, 235.0, 403.0 ],
+                    "patching_rect": [ 371.0, 744.0, 235.0, 403.0 ],
                     "scroll": 3,
                     "sono": 1
                 }
@@ -48,7 +148,7 @@
                     "numoutlets": 8,
                     "offset": [ 0.0, 0.0 ],
                     "outlettype": [ "signal", "signal", "", "list", "int", "", "", "" ],
-                    "patching_rect": [ 225.0, 238.0, 450.0, 241.0 ],
+                    "patching_rect": [ 225.0, 505.0, 471.0, 204.0 ],
                     "save": [ "#N", "vst~", "loaduniqueid", 0, "D:/Dev/clap/clap_ambient/build/clap_ambient.vst3", ";" ],
                     "saved_attribute_attributes": {
                         "valueof": {
@@ -111,9 +211,9 @@
                                     "fileref": {
                                         "name": "Clap Ambient (CLAP->VST3)",
                                         "filename": "Clap Ambient (CLAP->VST3).maxsnap",
-                                        "filepath": "~/Documents/Max 9/Snapshots",
+                                        "filepath": "D:/Documents/Max 9/Snapshots",
                                         "filepos": -1,
-                                        "snapshotfileid": "f54a31955d5f070eedd075e28b80c1b9"
+                                        "snapshotfileid": "56b535adea36a41a4157dd9e3392699b"
                                     }
                                 }
                             ]
@@ -164,7 +264,7 @@
                     "numinlets": 2,
                     "numoutlets": 1,
                     "outlettype": [ "bang" ],
-                    "patching_rect": [ 748.0, 488.0, 331.0, 110.0 ]
+                    "patching_rect": [ 664.0, 744.0, 64.0, 351.0 ]
                 }
             },
             {
@@ -187,7 +287,7 @@
                     "numoutlets": 10,
                     "outlettype": [ "", "", "", "", "", "", "", "", "", "" ],
                     "patching_rect": [ 1094.0, 285.0, 289.0, 94.0 ],
-                    "release_time": 131.96204635959194
+                    "release_time": 153.0
                 }
             },
             {
@@ -209,18 +309,18 @@
                     "numoutlets": 4,
                     "outlettype": [ "signal", "signal", "signal", "signal" ],
                     "patching_rect": [ 933.0, 194.0, 81.0, 22.0 ],
-                    "text": "svf~ 2000 0.7"
+                    "text": "svf~ 5000 0.2"
                 }
             },
             {
                 "box": {
                     "id": "obj-3",
                     "maxclass": "newobj",
-                    "numinlets": 2,
+                    "numinlets": 1,
                     "numoutlets": 1,
                     "outlettype": [ "signal" ],
-                    "patching_rect": [ 933.0, 132.0, 60.0, 22.0 ],
-                    "text": "saw~ 200"
+                    "patching_rect": [ 933.0, 132.0, 44.0, 22.0 ],
+                    "text": "noise~"
                 }
             },
             {
@@ -341,7 +441,7 @@
                         "appversion": {
                             "major": 9,
                             "minor": 1,
-                            "revision": 0,
+                            "revision": 2,
                             "architecture": "x64",
                             "modernui": 1
                         },
@@ -546,7 +646,7 @@
                             }
                         ]
                     },
-                    "patching_rect": [ 163.0, 620.0, 70.0, 22.0 ],
+                    "patching_rect": [ 158.0, 888.0, 70.0, 22.0 ],
                     "text": "p Clip-Mute"
                 }
             },
@@ -558,7 +658,7 @@
                     "numoutlets": 1,
                     "outlettype": [ "int" ],
                     "parameter_enable": 0,
-                    "patching_rect": [ 239.0, 620.0, 60.0, 60.0 ]
+                    "patching_rect": [ 234.0, 888.0, 60.0, 60.0 ]
                 }
             },
             {
@@ -570,7 +670,7 @@
                     "numoutlets": 5,
                     "outlettype": [ "signal", "signal", "", "float", "list" ],
                     "parameter_enable": 1,
-                    "patching_rect": [ 163.0, 650.0, 70.0, 136.0 ],
+                    "patching_rect": [ 158.0, 918.0, 70.0, 136.0 ],
                     "saved_attribute_attributes": {
                         "valueof": {
                             "parameter_initial": [ 0.0 ],
@@ -593,7 +693,7 @@
                     "maxclass": "ezdac~",
                     "numinlets": 2,
                     "numoutlets": 0,
-                    "patching_rect": [ 239.0, 726.0, 60.0, 60.0 ]
+                    "patching_rect": [ 234.0, 994.0, 60.0, 60.0 ]
                 }
             },
             {
@@ -603,8 +703,8 @@
                     "numinlets": 2,
                     "numoutlets": 1,
                     "outlettype": [ "" ],
-                    "patching_rect": [ 305.0, 181.0, 355.0, 22.0 ],
-                    "text": "plug W:/clap/clap_ambient/build/debug/clap_ambient_debug.vst3"
+                    "patching_rect": [ 305.0, 181.0, 377.0, 22.0 ],
+                    "text": "plug D:/Dev/clap/clap_ambient/build/debug/clap_ambient_debug.vst3"
                 }
             }
         ],
@@ -638,7 +738,15 @@
             },
             {
                 "patchline": {
+                    "destination": [ "obj-1", 1 ],
+                    "order": 0,
+                    "source": [ "obj-10", 0 ]
+                }
+            },
+            {
+                "patchline": {
                     "destination": [ "obj-1", 0 ],
+                    "order": 1,
                     "source": [ "obj-10", 0 ]
                 }
             },
@@ -677,21 +785,21 @@
             {
                 "patchline": {
                     "destination": [ "obj-15", 2 ],
-                    "midpoints": [ 248.5, 683.1024378538132, 236.26674485206604, 683.1024378538132, 236.26674485206604, 614.1024378538132, 223.5, 614.1024378538132 ],
+                    "midpoints": [ 243.5, 951.1024378538132, 231.26674485206604, 951.1024378538132, 231.26674485206604, 882.1024378538132, 218.5, 882.1024378538132 ],
                     "source": [ "obj-16", 0 ]
                 }
             },
             {
                 "patchline": {
                     "destination": [ "obj-18", 1 ],
-                    "midpoints": [ 185.25, 797.1024378538132, 235.62244534492493, 797.1024378538132, 235.62244534492493, 719.1024378538132, 289.5, 719.1024378538132 ],
+                    "midpoints": [ 180.25, 1065.1024378538132, 230.62244534492493, 1065.1024378538132, 230.62244534492493, 987.1024378538132, 284.5, 987.1024378538132 ],
                     "source": [ "obj-17", 1 ]
                 }
             },
             {
                 "patchline": {
                     "destination": [ "obj-18", 0 ],
-                    "midpoints": [ 172.5, 797.1024378538132, 235.79023385047913, 797.1024378538132, 235.79023385047913, 722.1024378538132, 248.5, 722.1024378538132 ],
+                    "midpoints": [ 167.5, 1065.1024378538132, 230.79023385047913, 1065.1024378538132, 230.79023385047913, 990.1024378538132, 243.5, 990.1024378538132 ],
                     "source": [ "obj-17", 0 ]
                 }
             },
@@ -777,6 +885,12 @@
             },
             {
                 "patchline": {
+                    "destination": [ "obj-8", 0 ],
+                    "source": [ "obj-22", 0 ]
+                }
+            },
+            {
+                "patchline": {
                     "destination": [ "obj-11", 0 ],
                     "source": [ "obj-3", 0 ]
                 }
@@ -816,11 +930,38 @@
                     "destination": [ "obj-2", 0 ],
                     "source": [ "obj-6", 0 ]
                 }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-1", 1 ],
+                    "source": [ "obj-8", 1 ]
+                }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-1", 0 ],
+                    "source": [ "obj-8", 0 ]
+                }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-19", 3 ],
+                    "source": [ "obj-9", 0 ]
+                }
             }
         ],
         "parameters": {
             "obj-1": [ "vst~", "vst~", 0 ],
             "obj-17": [ "live.gain~[1]", "OutLevel", 0 ],
+            "obj-8": [ "vst~[1]", "vst~[1]", 0 ],
+            "parameterbanks": {
+                "0": {
+                    "index": 0,
+                    "name": "",
+                    "parameters": [ "-", "-", "-", "-", "-", "-", "-", "-" ],
+                    "buttons": [ "-", "-", "-", "-", "-", "-", "-", "-" ]
+                }
+            },
             "inherited_shortname": 1
         },
         "autosave": 0,
