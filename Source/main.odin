@@ -922,6 +922,8 @@ allpass2_process_sample :: #force_inline proc(ap: ^AllpassDelay2, in_sample: f32
 Looper :: struct {}
 GranularDelay :: struct {}
 
+when ODIN_OS == .Windows {
+
 GUI :: struct {
     window_class: win32.WNDCLASSW,
     window: win32.HWND,
@@ -932,6 +934,9 @@ GUI :: struct {
 
     test_slider_value :f32,
     test_slider_value2 :f32,
+}
+} else {
+GUI :: struct {}
 }
 
 PluginData :: struct {
@@ -1084,6 +1089,7 @@ state_extension := clap_ext.Plugin_State {
     load = plugin_state_load,
 }
 
+when ODIN_OS == .Windows {
 
 GImGui: ^imgui.Context
 
@@ -1471,6 +1477,8 @@ gui_extension := clap_ext.Plugin_Gui {
     show = show_gui,
     hide = hide_gui,
 }
+
+} // ODIN_OS == .Windows
 
 plugin_init :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
@@ -1879,7 +1887,10 @@ plugin_get_extension :: proc "c" (_plugin: ^clap.Plugin, id: cstring) -> rawptr 
         case clap_ext.EXT_AUDIO_PORTS: { return &audio_port_extension }
         case clap_ext.EXT_PARAMS:      { return &params_extension }
         case clap_ext.EXT_STATE:       { return &state_extension }
-        case clap_ext.EXT_GUI:         { return &gui_extension }
+        case clap_ext.EXT_GUI: { 
+            when ODIN_OS == .Windows { return &gui_extension } 
+            else                     { return nil }
+        }
     }
 
     return nil

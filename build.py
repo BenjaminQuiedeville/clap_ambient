@@ -54,7 +54,7 @@ def build_imgui(debug: bool):
         f"{imgui_temp_dir}/c_imgui_internal.cpp",
         f"{imgui_temp_dir}/imgui_impl_opengl3.cpp",
         f"{imgui_temp_dir}/imgui_impl_win32.cpp",
-    ])   
+    ])
 
     flags = "/MP /c"
     
@@ -72,24 +72,17 @@ def build_imgui(debug: bool):
     
     return 
 
-# def link_clap(debug: bool):
+def build_clap(debug: bool, optim: bool, config: str):
 
-#     command = f"link /ERRORREPORT:QUEUE /OUT:build/Debug/clap_echo.clap /INCREMENTAL /ILK:"clap_echo_clap.dir\Debug\clap_echo.ilk" /NOLOGO "
-#     """
+    flags = "-build-mode:dll -vet-semicolon"
+    if debug: flags += " -debug"
+    if optim: flags += " -o:speed"# -target-features:\"avx2\""
 
-#     C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.44.35207\bin\HostX64\x64\link.exe
-    
-#     Debug\clap_echo_static.lib
-#     opengl32.lib kernel32.lib user32.lib
-#     gdi32.lib winspool.lib shell32.lib
-#     ole32.lib oleaut32.lib uuid.lib
-#     comdlg32.lib advapi32.lib
-#     /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'"
-#     /manifest:embed /DEBUG /PDB:"C:/Users/benjamin/Dev/clap/clap_echo/build_msvc/CLAP/Debug/clap_echo.pdb"/SUBSYSTEM:CONSOLE
-#     /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/benjamin/Dev/clap/clap_echo/build_msvc/Debug/clap_echo.lib"/MACHINE:X64
-#     /machine:x64 /DLL clap_echo_clap.dir\Debug\plugin_entry.obj
-#     """
-#     return
+    build_dir = f"build"
+
+    command = f"odin build source -define:BUILD_CONFIG={config} -out:{build_dir}/ambient.clap {flags}"
+    run(command)    
+    return
 
 
 def build_vstsdk(debug: bool, optim: bool, config: str):
@@ -376,7 +369,7 @@ def main():
     build_wrapper(debug, optim, config)
     # build_imgui(debug)
     final_build(debug, optim, config)
-
+    build_clap(debug, optim, config)
     Print("Done")
     return
 
