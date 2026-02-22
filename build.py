@@ -336,7 +336,6 @@ def main():
     argc = len(sys.argv)
     
     if argc == 1: 
-        Print("First call 'python build.py deps' to build the dependencies")
         Print("Then call 'python build.py {debug|reldebug|release}' options to build the plugin")
         exit(0)
 
@@ -369,7 +368,7 @@ def main():
     build_wrapper(debug, optim, config)
     # build_imgui(debug)
     final_build(debug, optim, config)
-    build_clap(debug, optim, config)
+    # build_clap(debug, optim, config)
     Print("Done")
     return
 

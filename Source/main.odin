@@ -389,6 +389,15 @@ hadamard4_mix_buffers :: proc(inputs, outputs: [4][]f32) {
     }
 }
 
+/*
+notes :
+    essayer une boucle avec : 2AP -> 1DL -> 2AP -> 1DL répéter autant que voulu et boucler
+    injecter le signal à la sortie d'un DL (à un seul endroit pour pas avoir trop de diffusion au début)
+    extraire les signaux de sorties aux sorties des DL et les répartir gaiche/droite
+    complexifier le signal d'entrée par qq AP en séries, ou un FIR avec des AP sur chaque tap (simule les réflexions d'une grande piece)
+    une boucle comme ca est équivalente à un FDN avec une matrice de mix creuse, mais est moins couteuse (ne demande pas de multiplication matricielle O(N^2))
+    
+*/
 Reverb :: struct {
 
     in_lp: Biquad,
@@ -1097,9 +1106,9 @@ is_gui_api_supported :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floati
     return string(api) == clap_ext.WINDOW_API_WIN32 && !is_floating
 }
 
-gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floating: ^bool) -> bool {
+gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floating: bool) -> bool {
     api^ = clap_ext.WINDOW_API_WIN32
-    is_floating^ = false
+    // is_floating^ = false
     return true
 }
 
@@ -1357,7 +1366,7 @@ gui_set_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool {
 gui_set_parent :: proc "c" (_plugin: ^clap.Plugin, parent_window: ^clap_ext.Window) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
 
-    win32.SetParent(plugin.gui.window, transmute(win32.HWND)parent_window.handle.win32)
+    win32.SetParent(plugin.gui.window, transmute(win32.HWND)parent_window.handle.(rawptr))
     return true
 }
 
