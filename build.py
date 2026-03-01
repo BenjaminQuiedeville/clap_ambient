@@ -2,9 +2,6 @@ import os
 import os.path
 import sys
 
-
-vst_sdk_dir = "../../libs/vst3sdk"
-
 common_cpp_flags = " ".join([
     "/nologo /MP /W3 /WX- /diagnostics:column /EHsc",
     "/fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /std:c++20",
@@ -53,7 +50,7 @@ def build_imgui(debug: bool):
         f"{imgui_temp_dir}/c_imgui.cpp",
         f"{imgui_temp_dir}/c_imgui_internal.cpp",
         f"{imgui_temp_dir}/imgui_impl_opengl3.cpp",
-        f"{imgui_temp_dir}/imgui_impl_win32.cpp",
+        # f"{imgui_temp_dir}/imgui_impl_win32.cpp",
     ])
 
     flags = "/MP /c"
@@ -71,6 +68,13 @@ def build_imgui(debug: bool):
     run(link_command)
     
     return 
+
+
+def build_pugl(debug, optim, config):
+    os.chdir("libs/pugl-odin")
+    os.system("python build.py")
+    os.chdir("../..")
+    return
 
 def build_clap(debug: bool, optim: bool, config: str):
 
@@ -94,9 +98,9 @@ def build_vstsdk(debug: bool, optim: bool, config: str):
         return
 
     includes = " ".join([
-        f"/I{vst_sdk_dir}",
-        f"/I{vst_sdk_dir}/public.sdk",
-        f"/I{vst_sdk_dir}/pluginterfaces",
+        "/Ilibs/vst3sdk",
+        "/Ilibs/vst3sdk/public.sdk",
+        "/Ilibs/vst3sdk/pluginterfaces",
     ])
 
     flags = " ".join([
@@ -120,42 +124,42 @@ def build_vstsdk(debug: bool, optim: bool, config: str):
 
 
     sources = " ".join([
-        f"{vst_sdk_dir}/base/source/baseiids.cpp",
-        f"{vst_sdk_dir}/base/source/fbuffer.cpp",
-        f"{vst_sdk_dir}/base/source/fdebug.cpp",
-        f"{vst_sdk_dir}/base/source/fdynlib.cpp",
-        f"{vst_sdk_dir}/base/source/fobject.cpp",
-        f"{vst_sdk_dir}/base/source/fstreamer.cpp",
-        f"{vst_sdk_dir}/base/source/fstring.cpp",
-        f"{vst_sdk_dir}/base/source/timer.cpp",
-        f"{vst_sdk_dir}/base/source/updatehandler.cpp" ,
-        f"{vst_sdk_dir}/base/thread/source/fcondition.cpp",
-        f"{vst_sdk_dir}/base/thread/source/flock.cpp",
-        f"{vst_sdk_dir}/pluginterfaces/base/conststringtable.cpp",
-        f"{vst_sdk_dir}/pluginterfaces/base/coreiids.cpp",
-        f"{vst_sdk_dir}/pluginterfaces/base/funknown.cpp",
-        f"{vst_sdk_dir}/pluginterfaces/base/ustring.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/commoniids.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/memorystream.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/openurl.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/pluginview.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/readfile.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/systemclipboard_linux.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/systemclipboard_win32.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/threadchecker_linux.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/common/threadchecker_win32.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/main/dllmain.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/main/pluginfactory.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/main/moduleinit.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/vstinitiids.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/vstnoteexpressiontypes.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/vstsinglecomponenteffect.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/vstaudioeffect.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/vstcomponent.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/vstcomponentbase.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/vstbus.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/vstparameters.cpp",
-        f"{vst_sdk_dir}/public.sdk/source/vst/utility/stringconvert.cpp",
+        "libs/vst3sdk/base/source/baseiids.cpp",
+        "libs/vst3sdk/base/source/fbuffer.cpp",
+        "libs/vst3sdk/base/source/fdebug.cpp",
+        "libs/vst3sdk/base/source/fdynlib.cpp",
+        "libs/vst3sdk/base/source/fobject.cpp",
+        "libs/vst3sdk/base/source/fstreamer.cpp",
+        "libs/vst3sdk/base/source/fstring.cpp",
+        "libs/vst3sdk/base/source/timer.cpp",
+        "libs/vst3sdk/base/source/updatehandler.cpp" ,
+        "libs/vst3sdk/base/thread/source/fcondition.cpp",
+        "libs/vst3sdk/base/thread/source/flock.cpp",
+        "libs/vst3sdk/pluginterfaces/base/conststringtable.cpp",
+        "libs/vst3sdk/pluginterfaces/base/coreiids.cpp",
+        "libs/vst3sdk/pluginterfaces/base/funknown.cpp",
+        "libs/vst3sdk/pluginterfaces/base/ustring.cpp",
+        "libs/vst3sdk/public.sdk/source/common/commoniids.cpp",
+        "libs/vst3sdk/public.sdk/source/common/memorystream.cpp",
+        "libs/vst3sdk/public.sdk/source/common/openurl.cpp",
+        "libs/vst3sdk/public.sdk/source/common/pluginview.cpp",
+        "libs/vst3sdk/public.sdk/source/common/readfile.cpp",
+        "libs/vst3sdk/public.sdk/source/common/systemclipboard_linux.cpp",
+        "libs/vst3sdk/public.sdk/source/common/systemclipboard_win32.cpp",
+        "libs/vst3sdk/public.sdk/source/common/threadchecker_linux.cpp",
+        "libs/vst3sdk/public.sdk/source/common/threadchecker_win32.cpp",
+        "libs/vst3sdk/public.sdk/source/main/dllmain.cpp",
+        "libs/vst3sdk/public.sdk/source/main/pluginfactory.cpp",
+        "libs/vst3sdk/public.sdk/source/main/moduleinit.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/vstinitiids.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/vstnoteexpressiontypes.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/vstsinglecomponenteffect.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/vstaudioeffect.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/vstcomponent.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/vstcomponentbase.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/vstbus.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/vstparameters.cpp",
+        "libs/vst3sdk/public.sdk/source/vst/utility/stringconvert.cpp",
     ])
 
     compile_command = f"cl /c {flags} {defines} {includes} {sources} /Fo:{build_dir}/ /Fd:{build_dir}/vstsdk.pdb"
@@ -202,27 +206,27 @@ def build_wrapper(debug: bool, optim: bool, config: str):
     if optim and not debug: defines += " /D RELEASE"
 
     includes = " ".join([
-        "/I../clap/include",
-        "/Iclap-wrapper/include",
-        "/Iclap-wrapper/libs/fmt",
-        "/Iclap-wrapper/libs/psl",
-        "/Iclap-wrapper/src",
-        f"/I{vst_sdk_dir}",
-        f"/I{vst_sdk_dir}/public.sdk",
-        f"/I{vst_sdk_dir}/pluginterfaces",
+        "/Ilibs/clap/include",
+        "/Ilibs/clap-wrapper/include",
+        "/Ilibs/clap-wrapper/libs/fmt",
+        "/Ilibs/clap-wrapper/libs/psl",
+        "/Ilibs/clap-wrapper/src",
+        "/Ilibs/vst3sdk",
+        "/Ilibs/vst3sdk/public.sdk",
+        "/Ilibs/vst3sdk/pluginterfaces",
     ])
 
     sources = " ".join([
-        "clap-wrapper/src/clap_proxy.cpp",
-        "clap-wrapper/src/detail/shared/sha1.cpp",
-        "clap-wrapper/src/detail/clap/fsutil.cpp",
-        "clap-wrapper/src/detail/os/windows.cpp",
-        "clap-wrapper/src/wrapasvst3_entry.cpp",
-        "clap-wrapper/src/wrapasvst3.cpp",
-        "clap-wrapper/src/detail/vst3/parameter.cpp",
-        "clap-wrapper/src/detail/vst3/plugview.cpp",
-        "clap-wrapper/src/detail/vst3/process.cpp",
-        "clap-wrapper/src/detail/vst3/categories.cpp",
+        "libs/clap-wrapper/src/clap_proxy.cpp",
+        "libs/clap-wrapper/src/detail/shared/sha1.cpp",
+        "libs/clap-wrapper/src/detail/clap/fsutil.cpp",
+        "libs/clap-wrapper/src/detail/os/windows.cpp",
+        "libs/clap-wrapper/src/wrapasvst3_entry.cpp",
+        "libs/clap-wrapper/src/wrapasvst3.cpp",
+        "libs/clap-wrapper/src/detail/vst3/parameter.cpp",
+        "libs/clap-wrapper/src/detail/vst3/plugview.cpp",
+        "libs/clap-wrapper/src/detail/vst3/process.cpp",
+        "libs/clap-wrapper/src/detail/vst3/categories.cpp",
     ])
 
     compile_command = f"cl.exe {flags} {defines} {includes} {sources} /Fo:{build_dir}/ /Fd:{build_dir}/clap-wrapper.pdb"
@@ -268,16 +272,16 @@ def final_build(debug: bool, optim: bool, config: str):
     includes = " ".join([
         "/I clap-wrapper/libs/psl",
         "/I../clap/include",
-        f"/I{vst_sdk_dir}",
-        f"/I{vst_sdk_dir}/public.sdk",
-        f"/I{vst_sdk_dir}/pluginterfaces",
+        "/Ilibs/vst3sdk",
+        "/Ilibs/vst3sdk/public.sdk",
+        "/Ilibs/vst3sdk/pluginterfaces",
         "/Iclap-wrapper/include",
         "/Iclap-wrapper/libs/fmt",
         "/Iclap-wrapper/src",
     ])
 
     sources = " ".join([
-        "clap-wrapper/src/wrapasvst3_export_entry.cpp",
+        "libs/clap-wrapper/src/wrapasvst3_export_entry.cpp",
     ])
 
     compile_command = f"cl.exe {flags} {defines} {includes} {sources} /Fo:{entry_point_build_dir}/ /Fd:{entry_point_build_dir}/entry_point.pdb"
@@ -305,8 +309,8 @@ def final_build(debug: bool, optim: bool, config: str):
     
     libs = " ".join([
         "opengl32.lib", "kernel32.lib", "shell32.lib", "gdi32.lib", "user32.lib",
-        "ole32.lib", "oleaut32.lib", "uuid.lib", 
-        "imgui.lib",
+        "ole32.lib", "oleaut32.lib", "uuid.lib", "dwmapi.lib", 
+        "libs/odin-imgui/imgui_windows_x64.lib", "libs/pugl-odin/lib/pugl.lib"
     ])
     
     object_files = " ".join([
@@ -366,6 +370,7 @@ def main():
     build_plugin_code(debug, optim, config)
     build_vstsdk(debug, optim, config)
     build_wrapper(debug, optim, config)
+    build_pugl(debug, optim, config)
     # build_imgui(debug)
     final_build(debug, optim, config)
     # build_clap(debug, optim, config)

@@ -10,13 +10,17 @@ import "core:slice"
 import "core:fmt"
 import "core:strings"
 import "core:strconv"
+import "core:c"
 import opengl "vendor:OpenGL"
 
-import imgui "../odin-imgui"
-import imgui_win32 "../odin-imgui/imgui_impl_win32"
-import imgui_opengl "../odin-imgui/imgui_impl_opengl3"
-import clap  "../clap-odin"
-import clap_ext "../clap-odin/ext"
+import imgui "../libs//odin-imgui"
+// import imgui_win32 "../odin-imgui/imgui_impl_win32"
+import imgui_opengl "../libs/odin-imgui/imgui_impl_opengl3"
+import clap  "../libs/clap-odin"
+import clap_ext "../libs/clap-odin/ext"
+import clap_factory "../libs/clap-odin/factory"
+
+import pugl "../libs/pugl-odin"
 
 BUILD_CONFIG :: #config(BUILD_CONFIG, "debug")
 
@@ -59,82 +63,81 @@ ParamInfo :: struct {
     max: f32,
     default_value: f32,
     imgui_flags: imgui.SliderFlags,
-    clap_param_flags: clap_ext.Param_Info_Flag,
+    clap_param_flags: u32,
 }
 
-@(rodata)
 parameter_infos := [ParamIDs]ParamInfo {
     .InGain = {
         name = "In Gain", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .OutGain = {
         name = "Out Gain", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
 
     .EchoTime = {
         name = "Delay Time", format_string = "%.2f ms", min = 1.0, max = 2000.0, default_value = 300.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE
     },
     .EchoFeedback = {
         name = "Feedback", format_string = "%.2f %%", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE
     },
     .EchoTone = {
         name = "Echo tone", format_string = "%.2f Hz", min = 500.0, max = 20000.0, default_value = 20000.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange, .Logarithmic},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .EchoModFreq = {
         name = "Echo mod freq", format_string = "%.2f Hz", min = 0.0, max = 10.0, default_value = 1.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .EchoModAmount = {
         name = "Echo mod amount", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .EchoMix = {
         name = "Mix", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE
     },
 
     .ReverbDecay = {
         name = "Reverb decay", format_string = "%.2f%%", min = 0.0, max = 100.0, default_value = 5.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbSize = {
         name = "Reverb size", format_string = "%.2f", min = 1.0, max = 5.0, default_value = 1.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbEarlyDiffusion = {
         name = "Reverb Early Diffusion", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbLateDiffusion = {
         name = "Reverb Late Diffusion", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbTone = {
         name = "Reverb Tone", format_string = "%.2f", min = 200.0, max = 20000.0, default_value = 15000.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange, .Logarithmic},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbMix = {
         name = "Reverb mix", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = .AUTOMATABLE,
+        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
 }
 
@@ -931,21 +934,16 @@ allpass2_process_sample :: #force_inline proc(ap: ^AllpassDelay2, in_sample: f32
 Looper :: struct {}
 GranularDelay :: struct {}
 
-when ODIN_OS == .Windows {
 
 GUI :: struct {
-    window_class: win32.WNDCLASSW,
-    window: win32.HWND,
+    world: ^pugl.World,
+    view: ^pugl.View,
+    timer_id: clap.Clap_Id,
     imgui_context: ^imgui.Context,
-    opengl_context: win32.HGLRC,
-    device_context: win32.HDC,
     width, height: int,
 
     test_slider_value :f32,
     test_slider_value2 :f32,
-}
-} else {
-GUI :: struct {}
 }
 
 PluginData :: struct {
@@ -981,7 +979,7 @@ get_audio_ports_info :: proc "c" (plugin: ^clap.Plugin, index: u32, is_input: bo
     // si y'a un probleme de canal audio faut revenir ici
     info.id = 0
     info.channel_count = 2
-    info.flags = cast(u32)clap_ext.Audio_Port_Flag.IS_MAIN
+    info.flags = cast(u32)clap_ext.AUDIO_PORT_IS_MAIN
     info.port_type = clap_ext.AUDIO_PORT_STEREO
     info.in_place_pair = clap.INVALID_ID
     port_name := "Main audio port"
@@ -1075,7 +1073,7 @@ params_extension := clap_ext.Plugin_Params {
 }
 
 
-plugin_state_save :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.OStream) -> bool {
+plugin_state_save :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.Output_Stream) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
 
     // sync les parametres avant de les sauvegarder
@@ -1084,7 +1082,7 @@ plugin_state_save :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.OStream) -> 
     return u64(num_params_written) == size_of(f32) * len(ParamIDs)
 }
 
-plugin_state_load :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.IStream) -> bool {
+plugin_state_load :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.Input_Stream) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
 
     num_params_read := stream.read(stream, raw_data(&plugin.main_param_values), size_of(f32) * len(ParamIDs))
@@ -1098,15 +1096,27 @@ state_extension := clap_ext.Plugin_State {
     load = plugin_state_load,
 }
 
-when ODIN_OS == .Windows {
+gui_timer_callback :: proc "c" (_plugin: ^clap.Plugin, timer_id: clap.Clap_Id) {
+    // reprendre les fonctions dans les exemples 
+    // appeler pugl.UpdateView
+    context = runtime.default_context()
+    plugin := transmute(^PluginData)_plugin.plugin_data
+    gui := &plugin.gui
+    
+    pugl.Update(gui.world, 0.0)
+    
+}
 
-GImGui: ^imgui.Context
+@(rodata)
+timer_extension := clap_ext.Plugin_Timer_Support {
+    on_timer = gui_timer_callback
+}
 
 is_gui_api_supported :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool {
     return string(api) == clap_ext.WINDOW_API_WIN32 && !is_floating
 }
 
-gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floating: bool) -> bool {
+gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floating: ^bool) -> bool {
     api^ = clap_ext.WINDOW_API_WIN32
     // is_floating^ = false
     return true
@@ -1158,44 +1168,59 @@ handle_widget_update :: proc(plugin: ^PluginData, param_index: ParamIDs, widget_
     }
 }
 
-window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wParam: win32.WPARAM, lParam: win32.LPARAM) -> win32.LRESULT {
+gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status {
     context = runtime.default_context()
-    plugin := transmute(^PluginData)win32.GetWindowLongPtrW(window, win32.GWLP_USERDATA)
-
-    if plugin == nil {
-        return win32.DefWindowProcW(window, message, wParam, lParam)
-    }
-
+    
+    plugin := transmute(^PluginData)pugl.GetHandle(view)
     gui := &plugin.gui
 
     imgui.SetCurrentContext(gui.imgui_context)
 
-    if imgui_win32.WndProcHandler(window, message, wParam, lParam) != 0 {
-        return 1
-    }
+    #partial switch event.type {
+        case .CONFIGURE: {
+            
+            pugl.EnterContext(gui.view)
+            opengl.Viewport(0, 0, cast(i32)event.configure.width, cast(i32)event.configure.height)
+            pugl.LeaveContext(gui.view)
+            pugl.ObscureView(gui.view)
+        
+        }
+        case .REALIZE: {
+            imgui.CHECKVERSION()
+            imgui.SetCurrentContext(nil)
+            gui.imgui_context = imgui.CreateContext()
+            imgui.SetCurrentContext(gui.imgui_context)
+            
+            imgui_io := imgui.GetIO()
+            imgui_io.ConfigFlags = { .NoKeyboard }
+            imgui_io.DisplaySize.x = f32(gui.width)
+            imgui_io.DisplaySize.y = f32(gui.height)
+            imgui_io.IniFilename = nil
+            imgui_io.LogFilename = nil
+            
+            imgui.StyleColorsDark()
+            
+            opengl.load_up_to(3, 2, win32.gl_set_proc_address)
+            imgui_opengl.Init()
+        }
+        case .UNREALIZE: {
 
-    switch message {
-        case win32.WM_SIZE: {
-            if wParam != win32.SIZE_MINIMIZED {
-                gui.width  = cast(int)win32.LOWORD(lParam)
-                gui.height = cast(int)win32.HIWORD(lParam)
-            }
+            imgui.SetCurrentContext(gui.imgui_context)
+            imgui_opengl.Shutdown()
+            imgui.DestroyContext()
+            gui.imgui_context = nil
+            imgui.SetCurrentContext(nil)
         }
-        case win32.WM_SIZING: {
-            edge := wParam
-            rect := transmute(^win32.RECT)lParam
-            win32.SetWindowPos(window, nil, rect.left, rect.top, rect.right, rect.bottom, 0)
+        case .UPDATE: {
+            pugl.ObscureView(gui.view)
         }
-        case win32.WM_TIMER: {
+        case .EXPOSE: {
             plugin_sync_audio_to_main(plugin)
 
-            result := win32.wglMakeCurrent(gui.device_context, gui.opengl_context)
-
+            io := imgui.GetIO()
             imgui_opengl.NewFrame()
-            imgui_win32.NewFrame()
             imgui.NewFrame()
 
-            io := imgui.GetIO()
             viewport := imgui.GetMainViewport()
             // position := viewport.WorkPos
             size := viewport.WorkSize
@@ -1264,64 +1289,89 @@ window_procedure :: proc "system" (window: win32.HWND, message: win32.UINT, wPar
 
             clear_color := imgui.Vec4 {0.45, 0.55, 0.6, 1.0}
             imgui.Render()
-            opengl.Viewport(0, 0, i32(gui.width), i32(gui.height))
+            
+            expose_event := &event.expose
+
+            opengl.Viewport(cast(i32)expose_event.x, cast(i32)expose_event.y, cast(i32)expose_event.width, cast(i32)expose_event.height)
             opengl.ClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w)
             opengl.Clear(opengl.COLOR_BUFFER_BIT)
 
             imgui_opengl.RenderDrawData(imgui.GetDrawData())
 
-            win32.SwapBuffers(gui.device_context)
-
             imgui.SetCurrentContext(nil)
-            win32.wglMakeCurrent(nil, nil)
-            return 0
         }
-
-        case: {
-            return win32.DefWindowProcW(window, message, wParam, lParam)
+        case .CLOSE: {}
+        case .FOCUS_IN: {}
+        case .FOCUS_OUT: {}
+        case .KEY_PRESS: {}
+        case .KEY_RELEASE: {}
+        case .TEXT: {
+            io := imgui.GetIO()
+            imgui.IO_AddInputCharacter(io, event.text.character)
         }
+        case .POINTER_IN: {}
+        case .POINTER_OUT: {}
+        
+        // mouse click
+        case .BUTTON_PRESS: {} fallthrough
+        case .BUTTON_RELEASE: {
+            
+            io := imgui.GetIO()
+            
+            button: imgui.MouseButton
+            button = imgui.MouseButton(event.button.button)
+            
+            is_pressed := event.type == .BUTTON_PRESS
+            imgui.IO_AddMouseButtonEvent(io, i32(button), is_pressed)
+        }
+        case .MOTION: {
+        
+            io := imgui.GetIO()
+        
+        
+            imgui.IO_AddMousePosEvent(io, cast(f32)event.motion.x, cast(f32)event.motion.y)
+        }
+        case .SCROLL: {}
+        case .CLIENT: {}
+        case .TIMER: {}
+        case .LOOP_ENTER: {}
+        case .LOOP_LEAVE: {}
+        case .DATA_OFFER: {}
+        case .DATA: {}
+        case: {}
     }
 
-    return 0
+    return .SUCCESS
 }
 
 
 create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool {
+    context = runtime.default_context()
     if !is_gui_api_supported(_plugin, api, is_floating) { return false }
 
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
-
-    mem.zero(&gui.window_class, size_of(gui.window_class))
-    gui.window_class.lpfnWndProc = window_procedure
-    gui.window_class.cbWndExtra = size_of(^PluginData)
-    gui.window_class.lpszClassName = PLUGIN_DESC_ID
-    gui.window_class.hCursor = win32.LoadCursorA(nil, win32.IDC_ARROW)
-    gui.window_class.style = win32.CS_OWNDC | win32.CS_DBLCLKS
-    win32.RegisterClassW(&gui.window_class)
-
+    
     gui.width = 1200
     gui.height = 600
-    gui.window = win32.CreateWindowW(gui.window_class.lpszClassName,
-                                    PLUGIN_NAME,
-                                    win32.WS_CHILD | win32.WS_VISIBLE | win32.WS_CLIPSIBLINGS,
-                                    win32.CW_USEDEFAULT, win32.CW_USEDEFAULT,
-                                    i32(gui.width), i32(gui.height),
-                                    win32.GetDesktopWindow(),
-                                    nil, gui.window_class.hInstance, nil)
-
-    win32.SetWindowLongPtrW(gui.window, win32.GWLP_USERDATA, transmute(win32.LONG_PTR)plugin)
+    
+    gui.world = pugl.NewWorld(.MODULE, 0)
+    pugl.SetWorldString(gui.world, .CLASS_NAME, PLUGIN_NAME)
+    
+    
+    // create timer
     return true
 }
 
 destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {
     plugin := transmute(^PluginData)_plugin.plugin_data
-
+    gui := &plugin.gui
+    
     plugin_hidden := hide_gui(_plugin)
 
-    win32.DestroyWindow(plugin.gui.window)
-    plugin.gui.window = nil
-    win32.UnregisterClassW(PLUGIN_DESC_ID, nil)
+    // kill timer
+
+    pugl.FreeWorld(gui.world)
 }
 
 set_gui_scale :: proc "c" (_plugin: ^clap.Plugin, scale: f64) -> bool { return true }
@@ -1339,8 +1389,8 @@ gui_can_resize :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
 // unused in wrapasvst3
 gui_get_resize_hints :: proc "c" (_plugin: ^clap.Plugin, hints: ^clap_ext.Gui_Resize_Hints) -> bool {
 
-    hints.can_resize_horizontally = true
-    hints.can_resize_vertically = true
+    hints.can_resize_horizontally = false
+    hints.can_resize_vertically = false
     hints.preserve_aspect_ratio = false
     hints.aspect_ratio_width = 0
     hints.aspect_ratio_height = 0
@@ -1358,15 +1408,21 @@ gui_set_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool {
     plugin.gui.width = int(width)
     plugin.gui.height = int(height)
 
-    win32.SetWindowPos(plugin.gui.window, nil, 0, 0, i32(width), i32(height), win32.SWP_NOMOVE | win32.SWP_NOOWNERZORDER | win32.SWP_NOZORDER)
-
     return true
 }
 
 gui_set_parent :: proc "c" (_plugin: ^clap.Plugin, parent_window: ^clap_ext.Window) -> bool {
+    context = runtime.default_context()
     plugin := transmute(^PluginData)_plugin.plugin_data
+    gui := &plugin.gui
+    
+    result := pugl.Status.SUCCESS
 
-    win32.SetParent(plugin.gui.window, transmute(win32.HWND)parent_window.handle.(rawptr))
+    gui.view = pugl.NewView(gui.world)
+
+    result = pugl.SetParent(plugin.gui.view, cast(pugl.Native_View)parent_window.handle.win32)
+    assert(result == .SUCCESS)
+    
     return true
 }
 
@@ -1374,67 +1430,30 @@ show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     context = runtime.default_context()
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
-
-    win32.ShowWindow(gui.window, win32.SW_SHOW)
-    win32.SetFocus(gui.window)
-
-    done := false
-    create_device_GL: {
-        device_context := win32.GetDC(gui.window)
-        pfd: win32.PIXELFORMATDESCRIPTOR
-        pfd.nSize = size_of(pfd)
-        pfd.nVersion = 1
-        pfd.dwFlags = win32.PFD_DRAW_TO_WINDOW | win32.PFD_SUPPORT_OPENGL | win32.PFD_DOUBLEBUFFER
-        pfd.iPixelType = win32.PFD_TYPE_RGBA
-        pfd.cColorBits = 32
-
-        pf := win32.ChoosePixelFormat(device_context, &pfd)
-        if pf == 0{
-            done = false
-            break create_device_GL
-        }
-
-        if win32.SetPixelFormat(device_context, pf, &pfd) == win32.FALSE {
-            done = false
-            break create_device_GL
-        }
-        win32.ReleaseDC(gui.window, device_context)
-
-        gui.device_context = win32.GetDC(gui.window)
-        if gui.opengl_context == nil {
-            gui.opengl_context = win32.wglCreateContext(gui.device_context)
-        }
-        done = true
-    }
-
-    if !done {
-        win32.wglMakeCurrent(nil, nil)
-        win32.ReleaseDC(gui.window, gui.device_context)
-        win32.DestroyWindow(gui.window)
-        win32.UnregisterClassW(PLUGIN_DESC_ID, nil)
-        return false
-    }
-
-    result := win32.wglMakeCurrent(gui.device_context, gui.opengl_context)
-    result = win32.ShowWindow(gui.window, win32.SW_SHOW)
-    result = win32.UpdateWindow(gui.window)
-
-    imgui.CHECKVERSION()
-    if GImGui != nil  { GImGui = nil }
-    imgui.SetCurrentContext(nil)
-    gui.imgui_context = imgui.CreateContext()
-    imgui.SetCurrentContext(gui.imgui_context)
-
-    imgui_io := imgui.GetIO()
-    imgui_io.ConfigFlags = { .NoKeyboard }
-
-    imgui.StyleColorsDark()
-
-    is_init := imgui_win32.InitForOpenGL(gui.window)
-    is_init = imgui_opengl.Init()
-    opengl.load_up_to(3, 2, win32.gl_set_proc_address)
-
-    win32.SetTimer(gui.window, 1, 30, nil)
+    
+    pugl.SetPositionHint(gui.view, .DEFAULT_POSITION, 0, 0)
+    pugl.SetSizeHint(gui.view, .DEFAULT_SIZE, u32(gui.width), u32(gui.height))
+    // pugl.SetViewHint(gui.view, .DOUBLE_BUFFER, 1)
+    // pugl.SetViewHint(gui.view, .SWAP_INTERVAL, 1)
+    pugl.SetViewHint(gui.view, .REFRESH_RATE, 60)
+    pugl.SetBackend(gui.view, pugl.GlBackend())
+    pugl.SetViewHint(gui.view, .CONTEXT_VERSION_MAJOR, 3)
+    pugl.SetViewHint(gui.view, .CONTEXT_VERSION_MINOR, 2)
+    pugl.SetViewHint(gui.view, .CONTEXT_PROFILE, cast(i32)pugl.View_Hint_Value.OPENGL_COMPATIBILITY_PROFILE)
+    pugl.SetHandle(gui.view, plugin)
+    
+    pugl.SetViewHint(gui.view, .RESIZABLE, 1)
+    
+    pugl.SetEventFunc(gui.view, gui_procedure)
+    
+    result := pugl.Realize(gui.view)
+    assert(result == nil)
+    
+    result = pugl.Show(gui.view, .RAISE) 
+    assert(result == .SUCCESS)
+    
+    host_timer_ext := transmute(^clap_ext.Host_Timer_Support)plugin.host->get_extension(clap_ext.EXT_TIMER_SUPPORT)
+    host_timer_ext.register_timer(plugin.host, 16, &gui.timer_id)
 
     return true
 }
@@ -1444,26 +1463,12 @@ hide_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
 
-    win32.ShowWindow(gui.window, win32.SW_HIDE)
-    win32.SetFocus(gui.window)
+    pugl.Hide(gui.view)
 
-    win32.wglMakeCurrent(gui.device_context, gui.opengl_context)
-    imgui.SetCurrentContext(gui.imgui_context)
+    host_timer_ext := transmute(^clap_ext.Host_Timer_Support)plugin.host->get_extension(clap_ext.EXT_TIMER_SUPPORT)
+    host_timer_ext.unregister_timer(plugin.host, gui.timer_id)
 
-    imgui_opengl.Shutdown()
-    imgui_win32.Shutdown()
-    imgui.DestroyContext()
-    gui.imgui_context = nil
-    imgui.SetCurrentContext(nil)
-
-    win32.wglMakeCurrent(nil, nil)
-    win32.ReleaseDC(gui.window, gui.device_context)
-
-    win32.wglDeleteContext(gui.opengl_context)
-    gui.opengl_context = nil
-    gui.device_context = nil
-
-    win32.KillTimer(gui.window, 1)
+    pugl.FreeView(gui.view)
 
     return true
 }
@@ -1487,7 +1492,6 @@ gui_extension := clap_ext.Plugin_Gui {
     hide = hide_gui,
 }
 
-} // ODIN_OS == .Windows
 
 plugin_init :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     plugin := transmute(^PluginData)_plugin.plugin_data
@@ -1660,7 +1664,7 @@ plugin_reset :: proc "c" (_plugin: ^clap.Plugin) {}
 
 process_event :: proc(plugin: ^PluginData, event: ^clap.Event_Header) {
 
-    if event.space_id == clap.CORE_EVENT_SPACE_ID && event.event_type == .PARAM_VALUE {
+    if event.space_id == clap.CORE_EVENT_SPACE_ID && event.event_type == clap.EVENT_PARAM_VALUE {
         param_event := transmute(^clap.Event_Param_Value)event
         param_index := cast(ParamIDs)param_event.param_id
 
@@ -1759,8 +1763,8 @@ sync_params_main_to_audio :: proc(plugin: ^PluginData, out_events: ^clap.Output_
                         size = size_of(clap.Event_Param_Value),
                         time = 0,
                         space_id = clap.CORE_EVENT_SPACE_ID,
-                        event_type = .PARAM_VALUE,
-                        flags = .IS_LIVE,
+                        event_type = clap.EVENT_PARAM_VALUE,
+                        flags = clap.EVENT_IS_LIVE,
                     },
                     param_id = u32(plugin_event.param_index),
                     cookie = nil,
@@ -1780,8 +1784,8 @@ sync_params_main_to_audio :: proc(plugin: ^PluginData, out_events: ^clap.Output_
                         size = size_of(clap.Event_Param_Gesture),
                         time = 0,
                         space_id = clap.CORE_EVENT_SPACE_ID,
-                        event_type = .PARAM_GESTURE_BEGIN,
-                        flags = .IS_LIVE,
+                        event_type = clap.EVENT_PARAM_GESTURE_BEGIN,
+                        flags = clap.EVENT_IS_LIVE,
                     },
                     param_id = u32(plugin_event.param_index),
                 }
@@ -1794,8 +1798,8 @@ sync_params_main_to_audio :: proc(plugin: ^PluginData, out_events: ^clap.Output_
                         size = size_of(clap.Event_Param_Gesture),
                         time = 0,
                         space_id = clap.CORE_EVENT_SPACE_ID,
-                        event_type = .PARAM_GESTURE_END,
-                        flags = .IS_LIVE,
+                        event_type = clap.EVENT_PARAM_GESTURE_END,
+                        flags = clap.EVENT_IS_LIVE,
                     },
                     param_id = u32(plugin_event.param_index),
                 }
@@ -1893,9 +1897,10 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
 
 plugin_get_extension :: proc "c" (_plugin: ^clap.Plugin, id: cstring) -> rawptr {
     switch id {
-        case clap_ext.EXT_AUDIO_PORTS: { return &audio_port_extension }
-        case clap_ext.EXT_PARAMS:      { return &params_extension }
-        case clap_ext.EXT_STATE:       { return &state_extension }
+        case clap_ext.EXT_AUDIO_PORTS:   { return &audio_port_extension }
+        case clap_ext.EXT_PARAMS:        { return &params_extension }
+        case clap_ext.EXT_STATE:         { return &state_extension }
+        case clap_ext.EXT_TIMER_SUPPORT: { return &timer_extension }
         case clap_ext.EXT_GUI: { 
             when ODIN_OS == .Windows { return &gui_extension } 
             else                     { return nil }
@@ -1925,13 +1930,13 @@ clap_plugin := clap.Plugin {
 
 plugin_descriptor : clap.Plugin_Descriptor
 
-get_plugin_count :: proc "c" (factory: ^clap.Plugin_Factory) -> u32 { return 1 }
+get_plugin_count :: proc "c" (factory: ^clap_factory.Plugin_Factory) -> u32 { return 1 }
 
-get_plugin_descriptor :: proc "c" (factory: ^clap.Plugin_Factory, index: u32) -> ^clap.Plugin_Descriptor {
+get_plugin_descriptor :: proc "c" (factory: ^clap_factory.Plugin_Factory, index: u32) -> ^clap.Plugin_Descriptor {
     return index == 0 ? &plugin_descriptor : nil
 }
 
-create_plugin :: proc "c" (factory: ^clap.Plugin_Factory, host: ^clap.Host, plugin_id: cstring) -> ^clap.Plugin {
+create_plugin :: proc "c" (factory: ^clap_factory.Plugin_Factory, host: ^clap.Host, plugin_id: cstring) -> ^clap.Plugin {
 
     if plugin_id != plugin_descriptor.id {
         return nil
@@ -1946,7 +1951,7 @@ create_plugin :: proc "c" (factory: ^clap.Plugin_Factory, host: ^clap.Host, plug
     return &plugin.plugin
 }
 
-plugin_factory := clap.Plugin_Factory {
+plugin_factory := clap_factory.Plugin_Factory {
     get_plugin_count = get_plugin_count,
     get_plugin_descriptor = get_plugin_descriptor,
     create_plugin = create_plugin,
@@ -2005,6 +2010,6 @@ clap_entry := clap.Plugin_Entry {
     },
 
     get_factory = proc "c" (id: cstring) -> rawptr {
-        return id == clap.PLUGIN_FACTORY_ID ? &plugin_factory : nil
+        return id == clap_factory.PLUGIN_FACTORY_ID ? &plugin_factory : nil
     },
 }

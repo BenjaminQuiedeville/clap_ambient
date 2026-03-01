@@ -1,9 +1,21 @@
 [submodule "odin-imgui"]
-	path = odin-imgui
+	path = libs/odin-imgui
 	url = https://gitlab.com/L-4/odin-imgui.git
 [submodule "clap-wrapper"]
-	path = clap-wrapper
+	path = libs/clap-wrapper
 	url = https://github.com/free-audio/clap-wrapper.git
 [submodule "clap-odin"]
-	path = clap-odin
+	path = libs/clap-odin
 	url = https://github.com/MalgAmoe/clap-odin.git
+[submodule "pugl"]
+	path = pugl
+	url = https://github.com/lv2/pugl.git
+[submodule "libs/pugl-odin"]
+	path = libs/pugl-odin
+	url = https://github.com/BenjaminQuiedeville/pugl-odin.git
+[submodule "libs/vst3sdk"]
+	path = libs/vst3sdk
+	url = https://github.com/steinbergmedia/vst3sdk.git
+[submodule "libs/clap"]
+	path = libs/clap
+	url = https://github.com/free-audio/clap.git
