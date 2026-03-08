@@ -13,16 +13,22 @@ import "core:strconv"
 import "core:c"
 import opengl "vendor:OpenGL"
 
-import imgui "../libs//odin-imgui"
+import imgui "../libs/odin-imgui"
 // import imgui_win32 "../odin-imgui/imgui_impl_win32"
 import imgui_opengl "../libs/odin-imgui/imgui_impl_opengl3"
-import clap  "../libs/clap-odin"
-import clap_ext "../libs/clap-odin/ext"
-import clap_factory "../libs/clap-odin/factory"
-
 import pugl "../libs/pugl-odin"
 
-BUILD_CONFIG :: #config(BUILD_CONFIG, "debug")
+import cplug "../libs/cplug-odin"
+
+when ODIN_DEBUG {
+    when ODIN_OPTIMIZATION_MODE == .None {
+        BUILD_CONFIG :: "debug"
+    } else {
+        BUILD_CONFIG :: "release_debug"
+    }
+} else {
+    BUILD_CONFIG :: "release"
+}
 
 PLUGIN_DESC_ID :: "fdn_seeker.clap_ambient_" + BUILD_CONFIG
 PLUGIN_NAME    :: "Clap Ambient " + BUILD_CONFIG
@@ -34,7 +40,7 @@ PLUGIN_NAME    :: "Clap Ambient " + BUILD_CONFIG
 // pourquoi pas dans le fond afficher le spectre de sortie ou une animation rigolote (apprendre opengl imagine)
 
 
-ParamIDs :: enum {
+ParamIDs :: enum u32 {
     //Global
     InGain,
     OutGain,
@@ -63,81 +69,66 @@ ParamInfo :: struct {
     max: f32,
     default_value: f32,
     imgui_flags: imgui.SliderFlags,
-    clap_param_flags: u32,
 }
 
 parameter_infos := [ParamIDs]ParamInfo {
     .InGain = {
         name = "In Gain", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .OutGain = {
         name = "Out Gain", format_string = "%.2f dB", min = -60.0, max = 6.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
 
     .EchoTime = {
         name = "Delay Time", format_string = "%.2f ms", min = 1.0, max = 2000.0, default_value = 300.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE
     },
     .EchoFeedback = {
         name = "Feedback", format_string = "%.2f %%", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE
     },
     .EchoTone = {
         name = "Echo tone", format_string = "%.2f Hz", min = 500.0, max = 20000.0, default_value = 20000.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange, .Logarithmic},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .EchoModFreq = {
         name = "Echo mod freq", format_string = "%.2f Hz", min = 0.0, max = 10.0, default_value = 1.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .EchoModAmount = {
         name = "Echo mod amount", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .EchoMix = {
         name = "Mix", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE
     },
 
     .ReverbDecay = {
         name = "Reverb decay", format_string = "%.2f%%", min = 0.0, max = 100.0, default_value = 5.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbSize = {
         name = "Reverb size", format_string = "%.2f", min = 1.0, max = 5.0, default_value = 1.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbEarlyDiffusion = {
         name = "Reverb Early Diffusion", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbLateDiffusion = {
         name = "Reverb Late Diffusion", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbTone = {
         name = "Reverb Tone", format_string = "%.2f", min = 200.0, max = 20000.0, default_value = 15000.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange, .Logarithmic},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
     .ReverbMix = {
         name = "Reverb mix", format_string = "%.2f", min = 0.0, max = 1.0, default_value = 0.5,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
-        clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE,
     },
 }
 
@@ -244,33 +235,33 @@ ramped_value_fill_buffer :: proc(value: ^RampedValue, nsamples: u32) {
 }
 
 
-ParamEventType :: enum {
-    GUI_VALUE_CHANGE,
-    GUI_GESTURE_BEGIN,
-    GUI_GESTURE_END,
-}
+// ParamEventType :: enum {
+//     GUI_VALUE_CHANGE,
+//     GUI_GESTURE_BEGIN,
+//     GUI_GESTURE_END,
+// }
 
-ParamEvent :: struct {
-    param_index: ParamIDs,
-    event_type: ParamEventType,
-    value: f32,
-}
+// ParamEvent :: struct {
+//     param_index: ParamIDs,
+//     event_type: ParamEventType,
+//     value: f32,
+// }
 
 FIFO_SIZE :: 256
 EventFIFO :: struct {
-    events: [FIFO_SIZE]ParamEvent,
+    events: [FIFO_SIZE]cplug.Event,
     write_index: u32,
     read_index: u32
 }
 
-main_push_event_to_audio :: proc(plugin: ^PluginData, param_index: ParamIDs, event_type: ParamEventType, value: f32) {
+main_push_event_to_audio :: proc(plugin: ^PluginData, param_index: ParamIDs, event_type: cplug.Event_Flag, value: f32) {
 
     write_index := intrin.atomic_load(&plugin.main_to_audio_fifo.write_index)
 
-    event: ^ParamEvent = &plugin.main_to_audio_fifo.events[write_index]
-    event.param_index = param_index
-    event.event_type = event_type
-    event.value = value
+    event: ^cplug.Event = &plugin.main_to_audio_fifo.events[write_index]
+    event.parameter.id = u32(param_index)
+    event.parameter.type = event_type
+    event.parameter.value = f64(value)
 
     intrin.atomic_add(&plugin.main_to_audio_fifo.write_index, 1)
     intrin.atomic_and(&plugin.main_to_audio_fifo.write_index, FIFO_SIZE-1)
@@ -936,9 +927,11 @@ GranularDelay :: struct {}
 
 
 GUI :: struct {
+    plugin: ^PluginData,
+    
     world: ^pugl.World,
     view: ^pugl.View,
-    timer_id: clap.Clap_Id,
+    timer_id: uintptr,
     imgui_context: ^imgui.Context,
     width, height: int,
 
@@ -947,18 +940,16 @@ GUI :: struct {
 }
 
 PluginData :: struct {
-    plugin: clap.Plugin,
-    host: ^clap.Host,
-    host_params: ^clap_ext.Host_Params,
-
+    host_context: ^cplug.Host_Context,
+    
     max_buffer_size: u32,
-    min_buffer_size: u32,
     samplerate: f32,
 
     main_param_values: [ParamIDs]f32,
     audio_param_values: [ParamIDs]f32,
     param_is_in_edit: [ParamIDs]bool,
     main_to_audio_fifo: EventFIFO,
+    audio_to_main_fifo: EventFIFO,
 
     input_gain: RampedValue,
     output_gain: RampedValue,
@@ -973,554 +964,105 @@ PluginData :: struct {
 }
 
 
-get_audio_ports_count :: proc "c" (plugin: ^clap.Plugin, is_input: bool) -> u32 { return 1 }
 
-get_audio_ports_info :: proc "c" (plugin: ^clap.Plugin, index: u32, is_input: bool, info: ^clap_ext.Audio_Port_Info) -> bool {
-    // si y'a un probleme de canal audio faut revenir ici
-    info.id = 0
-    info.channel_count = 2
-    info.flags = cast(u32)clap_ext.AUDIO_PORT_IS_MAIN
-    info.port_type = clap_ext.AUDIO_PORT_STEREO
-    info.in_place_pair = clap.INVALID_ID
-    port_name := "Main audio port"
-    for charac, index in transmute([]u8)port_name {
-       info.name[index] = charac
-    }
-    return true
+
+@(export, link_prefix = "cplug_")
+libraryLoad :: proc "c" () {
+    context = runtime.default_context()
 }
 
-@(rodata)
-audio_port_extension := clap_ext.Plugin_Audio_Ports {
-    count = get_audio_ports_count,
-    get = get_audio_ports_info,
+@(export, link_prefix = "cplug_")
+libraryUnload :: proc "c" () {
+    context = runtime.default_context()
 }
 
-get_num_params :: proc "c" (plugin: ^clap.Plugin) -> u32 { return len(ParamIDs) }
-
-params_get_info :: proc "c" (plugin: ^clap.Plugin, param_index: u32, information: ^clap_ext.Param_Info) -> bool {
-    if param_index >= len(ParamIDs) { return false }
-
-    param_id := cast(ParamIDs)param_index
-
-    mem.zero(information, size_of(information^))
-    information.id = param_index
-    information.flags = parameter_infos[param_id].clap_param_flags
-    information.min_value = f64(parameter_infos[param_id].min)
-    information.max_value = f64(parameter_infos[param_id].max)
-    information.default_value = f64(parameter_infos[param_id].default_value)
-
-    name := parameter_infos[param_id].name
-    for char_index in 0..<len(name) {
-        information.name[char_index] = raw_data(name)[char_index]
-    }
-
-    return true
-}
-
-param_get_value :: proc "c" (_plugin: ^clap.Plugin, param_id: clap.Clap_Id, out_value: ^f64) -> bool {
-    plugin := transmute(^PluginData)_plugin.plugin_data
-
-    if param_id > len(ParamIDs) { return false }
-
-    param_index := cast(ParamIDs)param_id
-
-    out_value^ = cast(f64)plugin.audio_param_values[param_index]
-    return true
-}
-
-param_convert_value_to_text :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, value: f64, out_buffer: [^]u8, out_buffer_capacity: u32) -> bool {
+@(export, link_prefix = "cplug_")
+createPlugin :: proc "c" (ctx: ^cplug.Host_Context) -> rawptr {
     context = runtime.default_context()
 
-    param_index := cast(ParamIDs)param_id
-
-    out_string := strings.string_from_ptr(out_buffer, int(out_buffer_capacity))
-    format_string := parameter_infos[param_index].format_string
-
-    fmt.bprintf(transmute([]u8)out_string, format_string, value)
-
-    return true
-}
-
-param_convert_text_to_value :: proc "c" (plugin: ^clap.Plugin, param_id: clap.Clap_Id, param_value_text: cstring, out_value: ^f64) -> bool {
-    context = runtime.default_context()
-
-    in_string := string(param_value_text)
-    out_value^, _ = strconv.parse_f64(in_string)
-    return false
-}
-
-param_flush :: proc "c" (_plugin: ^clap.Plugin, in_events: ^clap.Input_Events, out_events: ^clap.Output_Events) {
-    context = runtime.default_context()
-    plugin := transmute(^PluginData)_plugin.plugin_data
-
-    event_count := in_events.size(in_events)
-
-    sync_params_main_to_audio(plugin, out_events)
-
-    for event_index in 0..<event_count {
-        process_event(plugin, in_events->get(event_index))
-    }
-}
-
-@(rodata)
-params_extension := clap_ext.Plugin_Params {
-    count = get_num_params,
-    get_info = params_get_info,
-    get_value = param_get_value,
-    value_to_text = param_convert_value_to_text,
-    text_to_value = param_convert_text_to_value,
-    flush = param_flush
-}
-
-
-plugin_state_save :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.Output_Stream) -> bool {
-    plugin := transmute(^PluginData)_plugin.plugin_data
-
-    // sync les parametres avant de les sauvegarder
-
-    num_params_written := stream.write(stream, raw_data(&plugin.main_param_values), size_of(f32)*len(ParamIDs))
-    return u64(num_params_written) == size_of(f32) * len(ParamIDs)
-}
-
-plugin_state_load :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.Input_Stream) -> bool {
-    plugin := transmute(^PluginData)_plugin.plugin_data
-
-    num_params_read := stream.read(stream, raw_data(&plugin.main_param_values), size_of(f32) * len(ParamIDs))
-    success: bool = num_params_read == i64(size_of(f32)) * len(ParamIDs)
-    return success
-}
-
-@(rodata)
-state_extension := clap_ext.Plugin_State {
-    save = plugin_state_save,
-    load = plugin_state_load,
-}
-
-gui_timer_callback :: proc "c" (_plugin: ^clap.Plugin, timer_id: clap.Clap_Id) {
-    // reprendre les fonctions dans les exemples 
-    // appeler pugl.UpdateView
-    context = runtime.default_context()
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    gui := &plugin.gui
-    
-    pugl.Update(gui.world, 0.0)
-    
-}
-
-@(rodata)
-timer_extension := clap_ext.Plugin_Timer_Support {
-    on_timer = gui_timer_callback
-}
-
-is_gui_api_supported :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool {
-    return string(api) == clap_ext.WINDOW_API_WIN32 && !is_floating
-}
-
-gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floating: ^bool) -> bool {
-    api^ = clap_ext.WINDOW_API_WIN32
-    // is_floating^ = false
-    return true
-}
-
-make_hslider :: proc(plugin: ^PluginData, param_index: ParamIDs) {
-
-    infos := &parameter_infos[param_index]
-
-    slider_has_changed := imgui.SliderFloat(strings.clone_to_cstring(infos.name),
-                                            &plugin.main_param_values[param_index],
-                                            infos.min, infos.max,
-                                            strings.clone_to_cstring(infos.format_string),
-                                            infos.imgui_flags)
-
-    handle_widget_update(plugin, param_index, slider_has_changed)
-}
-
-make_vslider :: proc(plugin: ^PluginData, param_index: ParamIDs, size: imgui.Vec2) {
-    infos := &parameter_infos[param_index]
-
-    slider_has_changed := imgui.VSliderFloat(strings.clone_to_cstring(infos.name), size,
-                                            &plugin.main_param_values[param_index],
-                                            infos.min, infos.max,
-                                            strings.clone_to_cstring(infos.format_string),
-                                            infos.imgui_flags)
-
-    handle_widget_update(plugin, param_index, slider_has_changed)
-}
-
-handle_widget_update :: proc(plugin: ^PluginData, param_index: ParamIDs, widget_has_changed: bool) {
-
-    if widget_has_changed {
-
-        if !plugin.param_is_in_edit[param_index] {
-            plugin.param_is_in_edit[param_index] = true
-
-            main_push_event_to_audio(plugin, param_index, .GUI_GESTURE_BEGIN, plugin.main_param_values[param_index])
-        }
-
-        main_push_event_to_audio(plugin, param_index, .GUI_VALUE_CHANGE, plugin.main_param_values[param_index])
-    } else {
-
-        if plugin.param_is_in_edit[param_index] {
-            plugin.param_is_in_edit[param_index] = false
-
-            main_push_event_to_audio(plugin, param_index, .GUI_GESTURE_END, plugin.main_param_values[param_index])
-        }
-    }
-}
-
-gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status {
-    context = runtime.default_context()
-    
-    plugin := transmute(^PluginData)pugl.GetHandle(view)
-    gui := &plugin.gui
-
-    imgui.SetCurrentContext(gui.imgui_context)
-
-    #partial switch event.type {
-        case .CONFIGURE: {
-            
-            pugl.EnterContext(gui.view)
-            opengl.Viewport(0, 0, cast(i32)event.configure.width, cast(i32)event.configure.height)
-            pugl.LeaveContext(gui.view)
-            pugl.ObscureView(gui.view)
-        
-        }
-        case .REALIZE: {
-            imgui.CHECKVERSION()
-            imgui.SetCurrentContext(nil)
-            gui.imgui_context = imgui.CreateContext()
-            imgui.SetCurrentContext(gui.imgui_context)
-            
-            imgui_io := imgui.GetIO()
-            imgui_io.ConfigFlags = { .NoKeyboard }
-            imgui_io.DisplaySize.x = f32(gui.width)
-            imgui_io.DisplaySize.y = f32(gui.height)
-            imgui_io.IniFilename = nil
-            imgui_io.LogFilename = nil
-            
-            imgui.StyleColorsDark()
-            
-            opengl.load_up_to(3, 2, win32.gl_set_proc_address)
-            imgui_opengl.Init()
-        }
-        case .UNREALIZE: {
-
-            imgui.SetCurrentContext(gui.imgui_context)
-            imgui_opengl.Shutdown()
-            imgui.DestroyContext()
-            gui.imgui_context = nil
-            imgui.SetCurrentContext(nil)
-        }
-        case .UPDATE: {
-            pugl.ObscureView(gui.view)
-        }
-        case .EXPOSE: {
-            plugin_sync_audio_to_main(plugin)
-
-            io := imgui.GetIO()
-            imgui_opengl.NewFrame()
-            imgui.NewFrame()
-
-            viewport := imgui.GetMainViewport()
-            // position := viewport.WorkPos
-            size := viewport.WorkSize
-
-            // imgui.PushItemWidth(int), imgui.PopItemWidth()
-            {
-                imgui.SetNextWindowPos({0, 0})
-                imgui.SetNextWindowSize({size.x, size.y})
-
-                open: bool = true
-                imgui.Begin("Mainwindow", &open, {.NoCollapse, .NoResize})
-
-                gain_window_size : f32 = 60.0
-                imgui.BeginChild("Volumes", {500, gain_window_size})
-                make_hslider(plugin, .InGain)
-                // imgui.SameLine()
-                make_hslider(plugin, .OutGain)
-                imgui.EndChild()
-
-                imgui.BeginChild("Echo", {size.x/2, size.y-gain_window_size})
-
-                imgui.SeparatorText("Echo")
-                make_hslider(plugin, .EchoTime)
-                make_hslider(plugin, .EchoFeedback)
-                make_hslider(plugin, .EchoTone)
-                make_hslider(plugin, .EchoModFreq)
-                make_hslider(plugin, .EchoModAmount)
-                make_hslider(plugin, .EchoMix)
-
-                imgui.EndChild()
-
-                imgui.SameLine()
-
-                imgui.BeginChild("Reverb", {size.x/2, size.y-gain_window_size})
-
-                imgui.SeparatorText("Reverb")
-                make_hslider(plugin, .ReverbDecay)
-                make_hslider(plugin, .ReverbSize)
-                // make_hslider(plugin, .ReverbEarlyDiffusion)
-                // make_hslider(plugin, .ReverbLateDiffusion)
-                make_hslider(plugin, .ReverbTone)
-                make_hslider(plugin, .ReverbMix)
-
-                if imgui.Button("PANIC!") {
-                    for &dl in plugin.reverb.late.delay_lines {
-                        slice.zero(dl.buffer)
-                    }
-
-                    for &dl in plugin.reverb.diffusors[0].delay_lines {
-                        slice.zero(dl.buffer)
-                    }
-
-                    for &dl in plugin.reverb.diffusors[1].delay_lines {
-                        slice.zero(dl.buffer)
-                    }
-
-                    for &ap in plugin.reverb.diffusors[0].allpasses {
-                        slice.zero(ap.delay_line.buffer)
-                    }
-
-                }
-
-                imgui.EndChild()
-                imgui.End()
-            }
-
-            clear_color := imgui.Vec4 {0.45, 0.55, 0.6, 1.0}
-            imgui.Render()
-            
-            expose_event := &event.expose
-
-            opengl.Viewport(cast(i32)expose_event.x, cast(i32)expose_event.y, cast(i32)expose_event.width, cast(i32)expose_event.height)
-            opengl.ClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w)
-            opengl.Clear(opengl.COLOR_BUFFER_BIT)
-
-            imgui_opengl.RenderDrawData(imgui.GetDrawData())
-
-            imgui.SetCurrentContext(nil)
-        }
-        case .CLOSE: {}
-        case .FOCUS_IN: {}
-        case .FOCUS_OUT: {}
-        case .KEY_PRESS: {}
-        case .KEY_RELEASE: {}
-        case .TEXT: {
-            io := imgui.GetIO()
-            imgui.IO_AddInputCharacter(io, event.text.character)
-        }
-        case .POINTER_IN: {}
-        case .POINTER_OUT: {}
-        
-        // mouse click
-        case .BUTTON_PRESS: {} fallthrough
-        case .BUTTON_RELEASE: {
-            
-            io := imgui.GetIO()
-            
-            button: imgui.MouseButton
-            button = imgui.MouseButton(event.button.button)
-            
-            is_pressed := event.type == .BUTTON_PRESS
-            imgui.IO_AddMouseButtonEvent(io, i32(button), is_pressed)
-        }
-        case .MOTION: {
-        
-            io := imgui.GetIO()
-        
-        
-            imgui.IO_AddMousePosEvent(io, cast(f32)event.motion.x, cast(f32)event.motion.y)
-        }
-        case .SCROLL: {}
-        case .CLIENT: {}
-        case .TIMER: {}
-        case .LOOP_ENTER: {}
-        case .LOOP_LEAVE: {}
-        case .DATA_OFFER: {}
-        case .DATA: {}
-        case: {}
-    }
-
-    return .SUCCESS
-}
-
-
-create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool {
-    context = runtime.default_context()
-    if !is_gui_api_supported(_plugin, api, is_floating) { return false }
-
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    gui := &plugin.gui
-    
-    gui.width = 1200
-    gui.height = 600
-    
-    gui.world = pugl.NewWorld(.MODULE, 0)
-    pugl.SetWorldString(gui.world, .CLASS_NAME, PLUGIN_NAME)
-    
-    
-    // create timer
-    return true
-}
-
-destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    gui := &plugin.gui
-    
-    plugin_hidden := hide_gui(_plugin)
-
-    // kill timer
-
-    pugl.FreeWorld(gui.world)
-}
-
-set_gui_scale :: proc "c" (_plugin: ^clap.Plugin, scale: f64) -> bool { return true }
-
-get_gui_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool {
-    plugin := transmute(^PluginData)_plugin.plugin_data
-
-    width^ = u32(plugin.gui.width)
-    height^ = u32(plugin.gui.height)
-    return true
-}
-
-gui_can_resize :: proc "c" (_plugin: ^clap.Plugin) -> bool { return false }
-
-// unused in wrapasvst3
-gui_get_resize_hints :: proc "c" (_plugin: ^clap.Plugin, hints: ^clap_ext.Gui_Resize_Hints) -> bool {
-
-    hints.can_resize_horizontally = false
-    hints.can_resize_vertically = false
-    hints.preserve_aspect_ratio = false
-    hints.aspect_ratio_width = 0
-    hints.aspect_ratio_height = 0
-
-    return true
-}
-
-gui_adjust_size :: proc "c" (_plugin: ^clap.Plugin, width, height: ^u32) -> bool {
-    return get_gui_size(_plugin, width, height)
-}
-
-gui_set_size :: proc "c" (_plugin: ^clap.Plugin, width, height: u32) -> bool {
-
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    plugin.gui.width = int(width)
-    plugin.gui.height = int(height)
-
-    return true
-}
-
-gui_set_parent :: proc "c" (_plugin: ^clap.Plugin, parent_window: ^clap_ext.Window) -> bool {
-    context = runtime.default_context()
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    gui := &plugin.gui
-    
-    result := pugl.Status.SUCCESS
-
-    gui.view = pugl.NewView(gui.world)
-
-    result = pugl.SetParent(plugin.gui.view, cast(pugl.Native_View)parent_window.handle.win32)
-    assert(result == .SUCCESS)
-    
-    return true
-}
-
-show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
-    context = runtime.default_context()
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    gui := &plugin.gui
-    
-    pugl.SetPositionHint(gui.view, .DEFAULT_POSITION, 0, 0)
-    pugl.SetSizeHint(gui.view, .DEFAULT_SIZE, u32(gui.width), u32(gui.height))
-    // pugl.SetViewHint(gui.view, .DOUBLE_BUFFER, 1)
-    // pugl.SetViewHint(gui.view, .SWAP_INTERVAL, 1)
-    pugl.SetViewHint(gui.view, .REFRESH_RATE, 60)
-    pugl.SetBackend(gui.view, pugl.GlBackend())
-    pugl.SetViewHint(gui.view, .CONTEXT_VERSION_MAJOR, 3)
-    pugl.SetViewHint(gui.view, .CONTEXT_VERSION_MINOR, 2)
-    pugl.SetViewHint(gui.view, .CONTEXT_PROFILE, cast(i32)pugl.View_Hint_Value.OPENGL_COMPATIBILITY_PROFILE)
-    pugl.SetHandle(gui.view, plugin)
-    
-    pugl.SetViewHint(gui.view, .RESIZABLE, 1)
-    
-    pugl.SetEventFunc(gui.view, gui_procedure)
-    
-    result := pugl.Realize(gui.view)
-    assert(result == nil)
-    
-    result = pugl.Show(gui.view, .RAISE) 
-    assert(result == .SUCCESS)
-    
-    host_timer_ext := transmute(^clap_ext.Host_Timer_Support)plugin.host->get_extension(clap_ext.EXT_TIMER_SUPPORT)
-    host_timer_ext.register_timer(plugin.host, 16, &gui.timer_id)
-
-    return true
-}
-
-hide_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
-    context = runtime.default_context()
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    gui := &plugin.gui
-
-    pugl.Hide(gui.view)
-
-    host_timer_ext := transmute(^clap_ext.Host_Timer_Support)plugin.host->get_extension(clap_ext.EXT_TIMER_SUPPORT)
-    host_timer_ext.unregister_timer(plugin.host, gui.timer_id)
-
-    pugl.FreeView(gui.view)
-
-    return true
-}
-
-@(rodata)
-gui_extension := clap_ext.Plugin_Gui {
-    is_api_supported = is_gui_api_supported,
-    get_preferred_api = gui_get_preferred_api,
-    create = create_gui,
-    destroy = destroy_gui,
-    set_scale = set_gui_scale,
-    get_size = get_gui_size,
-    can_resize = gui_can_resize,
-    get_resize_hints = gui_get_resize_hints,
-    adjust_size = gui_adjust_size,
-    set_size = gui_set_size,
-    set_parent = gui_set_parent,
-    set_transient = proc "c" (_plugin: ^clap.Plugin, window: ^clap_ext.Window) -> bool { return false },
-    suggest_title = proc "c" (_plugin: ^clap.Plugin, title: cstring) {},
-    show = show_gui,
-    hide = hide_gui,
-}
-
-
-plugin_init :: proc "c" (_plugin: ^clap.Plugin) -> bool {
-    plugin := transmute(^PluginData)_plugin.plugin_data
+    plugin := new(PluginData)
+    plugin.host_context = ctx
 
     for param_id, _ in ParamIDs {
-        information: clap_ext.Param_Info
+        
+        info := &parameter_infos[param_id]
 
-        params_get_info(_plugin, u32(param_id), &information)
-        plugin.main_param_values[param_id] = f32(information.default_value)
-        plugin.audio_param_values[param_id] = f32(information.default_value)
+        plugin.main_param_values[param_id] = f32(info.default_value)
+        plugin.audio_param_values[param_id] = f32(info.default_value)
     }
 
-    plugin.host_params = transmute(^clap_ext.Host_Params)plugin.host.get_extension(plugin.host, clap_ext.EXT_PARAMS)
-    return true
+
+    return plugin
 }
 
-plugin_destroy :: proc "c" (_plugin: ^clap.Plugin) {
-    // plugin := transmute(^PluginData)_plugin.plugin_data
+@(export, link_prefix = "cplug_")
+destroyPlugin :: proc "c" (ptr: rawptr) {
+    plugin := transmute(^PluginData)ptr
     context = runtime.default_context()
 
-    free(_plugin.plugin_data)
+    deactivate_plugin(plugin)
+
+    free(plugin)
 }
 
-plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_size: u32, max_buffer_size: u32) -> bool {
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    context = runtime.default_context()
+@(export, link_prefix = "cplug_")
+getNumInputBusses :: proc "c" (rawptr) -> u32 { return 1 }
 
-    plugin.samplerate = cast(f32)samplerate
-    plugin.min_buffer_size = min_buffer_size
+@(export, link_prefix = "cplug_")
+getNumOutputBusses :: proc "c" (rawptr) -> u32 { return 1 }
+
+@(export, link_prefix = "cplug_")
+getInputBusChannelCount :: proc "c" (_: rawptr, bus_idx: u32) -> u32 { return 2}
+
+@(export, link_prefix = "cplug_")
+getOutputBusChannelCount :: proc "c" (_: rawptr, bus_idx: u32) -> u32 { return 2 }
+
+// Copy UTF8 name to this buffer, including null terminating byte.
+// NOTE: VST3 uses UTF16 strings with a max length of 128 characters. Cplug the handles UTF16<->UTF8 conversion
+//       CLAP has a max length of 256 bytes, AUv2 no limit (mandatory CFString), both are UTF8
+
+
+// trouver comment print les trucs lààà
+@(export, link_prefix = "cplug_")
+getInputBusName :: proc "c" (_: rawptr, idx: u32, buf: cstring, buflen: i32) {
+    context = runtime.default_context()
+    
+    fmt.bprintf(transmute([]u8)string(buf), "Stereo Input")
+}
+
+@(export, link_prefix = "cplug_")
+getOutputBusName :: proc "c" (_: rawptr, idx: u32, buf: cstring, buflen: i32) {
+    context = runtime.default_context()
+    fmt.bprintf(transmute([]u8)string(buf), "Stereo Output")
+}
+
+@(export, link_prefix = "cplug_")
+getLatencyInSamples :: proc "c" (rawptr) -> u32 { return 0 }
+
+@(export, link_prefix = "cplug_")
+getTailInSamples :: proc "c" (rawptr) -> u32 { return 0 }
+
+// frees all the memory of the plugin before deleting or reseting
+deactivate_plugin :: proc(plugin: ^PluginData) {
+
+    vmem.arena_destroy(&plugin.main_arena)
+
+    vmem.arena_destroy(&plugin.echo_arena)
+    plugin.echo.delay_lineL.buffer = nil
+    plugin.echo.delay_lineR.buffer = nil
+
+    vmem.arena_destroy(&plugin.reverb_arena)
+}
+
+@(export, link_prefix = "cplug_")
+setSampleRateAndBlockSize :: proc "c" (ptr: rawptr, sampleRate: f64, max_buffer_size: u32) {
+    context = runtime.default_context()
+    
+    plugin := transmute(^PluginData)ptr
+
+    deactivate_plugin(plugin)
+
+    plugin.samplerate = cast(f32)sampleRate
     plugin.max_buffer_size = max_buffer_size
 
     {
@@ -1638,39 +1180,578 @@ plugin_activate :: proc "c" (_plugin: ^clap.Plugin, samplerate: f64, min_buffer_
 
         reverb.mix = plugin.audio_param_values[.ReverbMix]
     }
+}
 
+@(export, link_prefix = "cplug_")
+process :: proc "c" (userPlugin: rawptr, ctx: ^cplug.Process_Context) {
+    context = runtime.default_context()
+    plugin := transmute(^PluginData)userPlugin
+
+    // sync main to audio thread and send events to cplug
+    read_index := intrin.atomic_load(&plugin.main_to_audio_fifo.read_index)
+    write_index := intrin.atomic_load(&plugin.main_to_audio_fifo.write_index)
+
+    for read_index != write_index {
+    
+        event := &plugin.main_to_audio_fifo.events[read_index]
+        
+        if event.type == .PARAM_CHANGE_UPDATE {
+            plugin.audio_param_values[ParamIDs(event.parameter.id)] = cast(f32)event.parameter.value
+        }
+        
+        ctx->enqueueEvent(event, 0)
+        
+        read_index += 1
+        read_index &= FIFO_SIZE-1
+    }    
+    intrin.atomic_store(&plugin.main_to_audio_fifo.read_index, read_index)
+
+
+    event: cplug.Event
+    current_frame: u32 = 0
+
+    for ctx->dequeueEvent(&event, current_frame) {
+        switch event.type {
+            case .PARAM_CHANGE_UPDATE: {
+                setParameterValue(plugin, event.parameter.id, event.parameter.value)
+            }
+            case .PROCESS_AUDIO: {
+                // audio render
+                nsamples : u32 = event.processAudio.endFrame - current_frame
+    
+                input_bus:  [^][^]f32 = ctx->getAudioInput(0)
+                output_bus: [^][^]f32 = ctx->getAudioOutput(0)
+                
+                assert(input_bus != nil)
+                assert(input_bus[0] != nil)
+                assert(input_bus[1] != nil)
+                
+                assert(output_bus != nil)
+                assert(output_bus[0] != nil)
+                assert(output_bus[1] != nil)
+    
+                inputL : []f32 = input_bus[0][current_frame:][:nsamples]
+                inputR : []f32 = input_bus[1][current_frame:][:nsamples]
+    
+                outputL : []f32 = output_bus[0][current_frame:][:nsamples]
+                outputR : []f32 = output_bus[1][current_frame:][:nsamples]
+    
+        
+                ramped_value_fill_buffer(&plugin.input_gain, nsamples)
+                ramped_value_fill_buffer(&plugin.output_gain, nsamples)
+    
+                for &sample, index in inputL { sample *= plugin.input_gain.value_buffer[index] }
+                for &sample, index in inputR { sample *= plugin.input_gain.value_buffer[index] }
+    
+    
+                echo_process(&plugin.echo, inputL, inputR)
+    
+                reverb_process(&plugin.reverb, inputL, inputR)
+    
+                for index in 0..<len(inputL) {
+                    inputL[index] = clamp(inputL[index], -1.0, 1.0)
+                    inputR[index] = clamp(inputR[index], -1.0, 1.0)
+                }
+    
+                for &sample, index in inputL { sample *= plugin.output_gain.value_buffer[index] }
+                for &sample, index in inputR { sample *= plugin.output_gain.value_buffer[index] }
+    
+                copy(outputL, inputL)
+                copy(outputR, inputR)
+                
+                current_frame = event.processAudio.endFrame
+            }
+            case .UNHANDLED_EVENT: {} 
+            case .MIDI: {}
+            case .PARAM_CHANGE_BEGIN: {}
+            case .PARAM_CHANGE_END: {}
+            case: {}
+        }
+    }
+
+    free_all(context.temp_allocator)
+}
+
+@(export, link_prefix = "cplug_")
+getNumParameters :: proc "c" (rawptr) -> u32 { return len(ParamIDs) }
+
+@(export, link_prefix = "cplug_")
+getParameterID :: proc "c" (_: rawptr, paramIndex: u32) -> u32 { return paramIndex }
+
+// CPLUG_FLAG_PARAMETER_
+@(export, link_prefix = "cplug_")
+getParameterFlags :: proc "c" (_: rawptr, paramId: u32) -> u32  {
+
+    return cast(u32)cplug.Parameter_Flag.IS_AUTOMATABLE
+}
+
+@(export, link_prefix = "cplug_")
+getParameterRange :: proc "c" (_: rawptr, paramId: u32, min: ^f64, max: ^f64) {
+    
+    min^ = cast(f64)parameter_infos[ParamIDs(paramId)].min
+    max^ = cast(f64)parameter_infos[ParamIDs(paramId)].max
+}
+
+// NOTE: AUv2 supports a max length of 52 bytes, VST3 128, CLAP 256
+
+@(export, link_prefix = "cplug_")
+getParameterName :: proc "c" (_: rawptr, paramId: u32, buf: [^]u8, buflen: i32) {
+    context = runtime.default_context()
+
+    name := parameter_infos[ParamIDs(paramId)].name
+    assert(len(name) < int(buflen))
+    fmt.bprint(buf[:buflen], name)
+}
+
+@(export, link_prefix = "cplug_")
+getParameterValue :: proc "c" (ptr: rawptr, paramId: u32) -> f64 {
+    plugin := transmute(^PluginData)ptr
+    
+    return cast(f64)plugin.audio_param_values[ParamIDs(paramId)]
+}
+
+@(export, link_prefix = "cplug_")
+getDefaultParameterValue :: proc "c" (_: rawptr, paramId: u32) -> f64 {
+    return cast(f64)parameter_infos[ParamIDs(paramId)].default_value
+}
+
+// [hopefully audio thread] VST3 & AU only
+
+@(export, link_prefix = "cplug_")
+setParameterValue :: proc "c" (ptr: rawptr, paramId: u32, value: f64) {
+    context = runtime.default_context()
+    // gérer la FIFO vers le main thread
+    handle_parameter_change(transmute(^PluginData)ptr, ParamIDs(paramId), f32(value))
+}
+
+// VST3 only
+
+@(export, link_prefix = "cplug_")
+denormaliseParameterValue :: proc "c" (_: rawptr, paramId: u32, value: f64) -> f64 {
+    context = runtime.default_context()
+    
+    min := cast(f64)parameter_infos[ParamIDs(paramId)].min
+    max := cast(f64)parameter_infos[ParamIDs(paramId)].max
+    
+    denorm_value := value * (max - min) + min
+    
+    denorm_value = clamp(denorm_value, min, max)
+    return denorm_value
+}
+
+@(export, link_prefix = "cplug_")
+normaliseParameterValue :: proc "c" (_: rawptr, paramId: u32, value: f64) -> f64 {
+    context = runtime.default_context()
+    
+    min := cast(f64)parameter_infos[ParamIDs(paramId)].min
+    max := cast(f64)parameter_infos[ParamIDs(paramId)].max
+    
+    norm_value := (value - min)/(max - min)
+    norm_value = clamp(norm_value, 0.0, 1.0) 
+    return norm_value
+}
+
+@(export, link_prefix = "cplug_")
+parameterStringToValue :: proc "c" (_: rawptr, paramId: u32, str: cstring) -> f64 {
+    context = runtime.default_context()
+
+    in_string := string(str)
+    out_value, _ := strconv.parse_f64(in_string)
+    // arrondir si le parametre est entier ou flottant
+    return out_value
+}
+
+@(export, link_prefix = "cplug_")
+parameterValueToString :: proc "c" (_: rawptr, paramId: u32, buf: [^]u8, bufsize: i32, value: f64) {
+    context = runtime.default_context()
+        
+    format_string := parameter_infos[cast(ParamIDs)paramId].format_string
+    mem.zero(buf, int(bufsize) * size_of(u8))
+    fmt.bprintf(buf[:bufsize], format_string, value)
+}
+
+
+// plugin_state_save :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.Output_Stream) -> bool {
+//     plugin := transmute(^PluginData)_plugin.plugin_data
+
+//     // sync les parametres avant de les sauvegarder
+
+//     num_params_written := stream.write(stream, raw_data(&plugin.main_param_values), size_of(f32)*len(ParamIDs))
+//     return u64(num_params_written) == size_of(f32) * len(ParamIDs)
+// }
+
+// plugin_state_load :: proc "c" (_plugin: ^clap.Plugin, stream: ^clap.Input_Stream) -> bool {
+//     plugin := transmute(^PluginData)_plugin.plugin_data
+
+//     num_params_read := stream.read(stream, raw_data(&plugin.main_param_values), size_of(f32) * len(ParamIDs))
+//     success: bool = num_params_read == i64(size_of(f32)) * len(ParamIDs)
+//     return success
+// }
+
+@(export, link_prefix = "cplug_")
+saveState :: proc "c" (userPlugin: rawptr, stateCtx: rawptr, writeProc: cplug.Write_Proc) {}
+
+@(export, link_prefix = "cplug_")
+loadState :: proc "c" (userPlugin: rawptr, stateCtx: rawptr, readProc: cplug.Read_Proc) {}
+
+// NOTE: For AUv2, your pointer MUST be castable to NSView. AUv2 hosts expect an NSView & you simply override methods
+// This is the only CPLUG method used in AUv2 builds.
+
+@(export, link_prefix = "cplug_")
+createGUI :: proc "c" (ptr: rawptr) -> rawptr {
+    context = runtime.default_context()
+
+    plugin := transmute(^PluginData)ptr
+    gui := &plugin.gui
+    gui.plugin = plugin
+    
+    gui.width = 1200
+    gui.height = 600
+    
+    gui.world = pugl.NewWorld(.MODULE, 0)
+    pugl.SetWorldString(gui.world, .CLASS_NAME, PLUGIN_NAME)
+    
+    
+    return gui
+}
+
+@(export, link_prefix = "cplug_")
+destroyGUI :: proc "c" (userGUI: rawptr) {
+    gui := transmute(^GUI)userGUI
+    plugin := gui.plugin
+    
+    setVisible(gui, i32(false))
+
+    pugl.FreeWorld(gui.world)
+    gui.world = nil
+}
+
+// If not NULL, set your window/view as a child/subview. If NULL, remove from parent/superview.
+// This is a good place to init/deinit your GFX and timer. Be prepared for this to be called multiple times with NULL
+
+@(export, link_prefix = "cplug_")
+setParent :: proc "c" (userGUI: rawptr, parent_window_handle: rawptr) {
+    context = runtime.default_context()
+    gui := transmute(^GUI)userGUI
+    plugin := gui.plugin
+    
+    if parent_window_handle == nil { 
+        if gui.view == nil { return }
+        pugl.FreeView(gui.view) 
+        gui.view = nil
+        return 
+    }
+    
+    gui.view = pugl.NewView(gui.world)
+    result := pugl.SetParent(plugin.gui.view, cast(pugl.Native_View)parent_window_handle)
+    assert(result == .SUCCESS)
+}
+
+// CLAP only. VST3 simply create/destroy your window.
+
+@(export, link_prefix = "cplug_")
+setVisible :: proc "c" (userGUI: rawptr, visible: i32) {
+    context = runtime.default_context()
+    gui := transmute(^GUI)userGUI
+    plugin := gui.plugin
+
+    if gui.view == nil { return }
+
+    if bool(visible) {
+    
+        pugl.SetPositionHint(gui.view, .DEFAULT_POSITION, 0, 0)
+        pugl.SetSizeHint(gui.view, .DEFAULT_SIZE, u32(gui.width), u32(gui.height))
+        // pugl.SetViewHint(gui.view, .DOUBLE_BUFFER, 1)
+        // pugl.SetViewHint(gui.view, .SWAP_INTERVAL, 1)
+        pugl.SetViewHint(gui.view, .REFRESH_RATE, 60)
+        pugl.SetBackend(gui.view, pugl.GlBackend())
+        pugl.SetViewHint(gui.view, .CONTEXT_VERSION_MAJOR, 3)
+        pugl.SetViewHint(gui.view, .CONTEXT_VERSION_MINOR, 2)
+        pugl.SetViewHint(gui.view, .CONTEXT_PROFILE, cast(i32)pugl.View_Hint_Value.OPENGL_COMPATIBILITY_PROFILE)
+        pugl.SetHandle(gui.view, plugin)
+        
+        pugl.SetViewHint(gui.view, .RESIZABLE, 1)
+        
+        pugl.SetEventFunc(gui.view, gui_procedure)
+        
+        result := pugl.Realize(gui.view)
+        assert(result == nil)
+        
+        result = pugl.Show(gui.view, .RAISE) 
+        assert(result == .SUCCESS)
+        
+        gui.timer_id = 1
+        result = pugl.StartTimer(gui.view, gui.timer_id, 16 * 0.001)
+        assert(result == .SUCCESS)
+
+    } else {
+        pugl.Hide(gui.view)
+        pugl.StopTimer(gui.view, gui.timer_id)
+    }
+}
+
+@(export, link_prefix = "cplug_")
+setScaleFactor :: proc "c" (userGUI: rawptr, scale: f32) {}
+
+@(export, link_prefix = "cplug_")
+getSize :: proc "c" (userGUI: rawptr, width: ^u32, height: ^u32) {
+    gui := transmute(^GUI)userGUI
+
+    width^ = u32(gui.width)
+    height^ = u32(gui.height) 
+}
+
+// Host is trying to resize, but giving you the chance to overwrite their size
+
+@(export, link_prefix = "cplug_")
+checkSize :: proc "c" (userGUI: rawptr, width: ^u32, height: ^u32) {
+    getSize(userGUI, width, height)
+}
+
+@(export, link_prefix = "cplug_")
+setSize :: proc "c" (userGUI: rawptr, width: u32, height: u32) -> bool {
+    gui := transmute(^GUI)userGUI
+
+    gui.width = int(width)
+    gui.height = int(height)
+    
     return true
 }
 
-plugin_deactivate :: proc "c" (_plugin: ^clap.Plugin) {
-    // desalloue tout ce a été alloué dans activate
-    plugin := transmute(^PluginData)_plugin.plugin_data
-    context = runtime.default_context()
+make_hslider :: proc(plugin: ^PluginData, param_index: ParamIDs) {
 
-    vmem.arena_destroy(&plugin.main_arena)
+    infos := &parameter_infos[param_index]
+    // fuite mémoire potentielle, mettre en place l'allocateur temporaire dans la boucle de gui
+    slider_has_changed := imgui.SliderFloat(strings.clone_to_cstring(infos.name),
+                                            &plugin.main_param_values[param_index],
+                                            infos.min, infos.max,
+                                            strings.clone_to_cstring(infos.format_string),
+                                            infos.imgui_flags)
 
-    vmem.arena_destroy(&plugin.echo_arena)
-    plugin.echo.delay_lineL.buffer = nil
-    plugin.echo.delay_lineR.buffer = nil
-
-    vmem.arena_destroy(&plugin.reverb_arena)
+    handle_widget_update(plugin, param_index, slider_has_changed)
 }
 
-plugin_start_processing :: proc "c" (_plugin: ^clap.Plugin) -> bool { return true }
+make_vslider :: proc(plugin: ^PluginData, param_index: ParamIDs, size: imgui.Vec2) {
+    infos := &parameter_infos[param_index]
 
-plugin_stop_processing :: proc "c" (_plugin: ^clap.Plugin) {}
+    slider_has_changed := imgui.VSliderFloat(strings.clone_to_cstring(infos.name), size,
+                                            &plugin.main_param_values[param_index],
+                                            infos.min, infos.max,
+                                            strings.clone_to_cstring(infos.format_string),
+                                            infos.imgui_flags)
 
-plugin_reset :: proc "c" (_plugin: ^clap.Plugin) {}
+    handle_widget_update(plugin, param_index, slider_has_changed)
+}
 
-process_event :: proc(plugin: ^PluginData, event: ^clap.Event_Header) {
+handle_widget_update :: proc(plugin: ^PluginData, param_index: ParamIDs, widget_has_changed: bool) {
 
-    if event.space_id == clap.CORE_EVENT_SPACE_ID && event.event_type == clap.EVENT_PARAM_VALUE {
-        param_event := transmute(^clap.Event_Param_Value)event
-        param_index := cast(ParamIDs)param_event.param_id
+    if widget_has_changed {
+        if !plugin.param_is_in_edit[param_index] {
+            plugin.param_is_in_edit[param_index] = true
 
-        handle_parameter_change(plugin, param_index, f32(param_event.value))
+            main_push_event_to_audio(plugin, param_index, .PARAM_CHANGE_BEGIN, plugin.main_param_values[param_index])
+        }
+
+        main_push_event_to_audio(plugin, param_index, .PARAM_CHANGE_UPDATE, plugin.main_param_values[param_index])
+    } else {
+
+        if plugin.param_is_in_edit[param_index] {
+            plugin.param_is_in_edit[param_index] = false
+
+            main_push_event_to_audio(plugin, param_index, .PARAM_CHANGE_END, plugin.main_param_values[param_index])
+        }
     }
 }
+
+gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status {
+    context = runtime.default_context()
+    
+    plugin := transmute(^PluginData)pugl.GetHandle(view)
+    gui := &plugin.gui
+
+    imgui.SetCurrentContext(gui.imgui_context)
+
+    #partial switch event.type {
+        case .CONFIGURE: {
+            
+            pugl.EnterContext(gui.view)
+            opengl.Viewport(0, 0, cast(i32)event.configure.width, cast(i32)event.configure.height)
+            pugl.LeaveContext(gui.view)
+            pugl.ObscureView(gui.view)
+        
+        }
+        case .REALIZE: {
+            imgui.CHECKVERSION()
+            imgui.SetCurrentContext(nil)
+            gui.imgui_context = imgui.CreateContext()
+            imgui.SetCurrentContext(gui.imgui_context)
+            
+            imgui_io := imgui.GetIO()
+            imgui_io.ConfigFlags = { .NoKeyboard }
+            imgui_io.DisplaySize.x = f32(gui.width)
+            imgui_io.DisplaySize.y = f32(gui.height)
+            imgui_io.IniFilename = nil
+            imgui_io.LogFilename = nil
+            
+            imgui.StyleColorsDark()
+            
+            opengl.load_up_to(3, 2, win32.gl_set_proc_address)
+            imgui_opengl.Init()
+        }
+        case .UNREALIZE: {
+
+            imgui.SetCurrentContext(gui.imgui_context)
+            imgui_opengl.Shutdown()
+            imgui.DestroyContext()
+            gui.imgui_context = nil
+            imgui.SetCurrentContext(nil)
+        }
+        case .UPDATE: {
+            pugl.ObscureView(gui.view)
+        }
+        case .EXPOSE: {
+            // plugin_sync_audio_to_main(plugin)
+
+            io := imgui.GetIO()
+            imgui_opengl.NewFrame()
+            imgui.NewFrame()
+
+            viewport := imgui.GetMainViewport()
+            // position := viewport.WorkPos
+            size := viewport.WorkSize
+
+            // imgui.PushItemWidth(int), imgui.PopItemWidth()
+            {
+                imgui.SetNextWindowPos({0, 0})
+                imgui.SetNextWindowSize({size.x, size.y})
+
+                open: bool = true
+                imgui.Begin("Mainwindow", &open, {.NoCollapse, .NoResize})
+
+                gain_window_size : f32 = 60.0
+                imgui.BeginChild("Volumes", {500, gain_window_size})
+                make_hslider(plugin, .InGain)
+                // imgui.SameLine()
+                make_hslider(plugin, .OutGain)
+                imgui.EndChild()
+
+                imgui.BeginChild("Echo", {size.x/2, size.y-gain_window_size})
+
+                imgui.SeparatorText("Echo")
+                make_hslider(plugin, .EchoTime)
+                make_hslider(plugin, .EchoFeedback)
+                make_hslider(plugin, .EchoTone)
+                make_hslider(plugin, .EchoModFreq)
+                make_hslider(plugin, .EchoModAmount)
+                make_hslider(plugin, .EchoMix)
+
+                imgui.EndChild()
+
+                imgui.SameLine()
+
+                imgui.BeginChild("Reverb", {size.x/2, size.y-gain_window_size})
+
+                imgui.SeparatorText("Reverb")
+                make_hslider(plugin, .ReverbDecay)
+                make_hslider(plugin, .ReverbSize)
+                // make_hslider(plugin, .ReverbEarlyDiffusion)
+                // make_hslider(plugin, .ReverbLateDiffusion)
+                make_hslider(plugin, .ReverbTone)
+                make_hslider(plugin, .ReverbMix)
+
+                if imgui.Button("PANIC!") {
+                    for &dl in plugin.reverb.late.delay_lines {
+                        slice.zero(dl.buffer)
+                    }
+
+                    for &dl in plugin.reverb.diffusors[0].delay_lines {
+                        slice.zero(dl.buffer)
+                    }
+
+                    for &dl in plugin.reverb.diffusors[1].delay_lines {
+                        slice.zero(dl.buffer)
+                    }
+
+                    for &ap in plugin.reverb.diffusors[0].allpasses {
+                        slice.zero(ap.delay_line.buffer)
+                    }
+
+                }
+
+                imgui.EndChild()
+                imgui.End()
+            }
+
+            clear_color := imgui.Vec4 {0.45, 0.55, 0.6, 1.0}
+            imgui.Render()
+            
+            expose_event := &event.expose
+
+            opengl.Viewport(cast(i32)expose_event.x, cast(i32)expose_event.y, cast(i32)expose_event.width, cast(i32)expose_event.height)
+            opengl.ClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w)
+            opengl.Clear(opengl.COLOR_BUFFER_BIT)
+
+            imgui_opengl.RenderDrawData(imgui.GetDrawData())
+
+            imgui.SetCurrentContext(nil)
+        }
+        case .CLOSE: {}
+        case .FOCUS_IN: {}
+        case .FOCUS_OUT: {}
+        case .KEY_PRESS: {}
+        case .KEY_RELEASE: {}
+        case .TEXT: {
+            io := imgui.GetIO()
+            imgui.IO_AddInputCharacter(io, event.text.character)
+        }
+        case .POINTER_IN: {}
+        case .POINTER_OUT: {}
+        
+        // mouse click
+        case .BUTTON_PRESS: {} fallthrough
+        case .BUTTON_RELEASE: {
+            
+            io := imgui.GetIO()
+            
+            button: imgui.MouseButton
+            button = imgui.MouseButton(event.button.button)
+            
+            is_pressed := event.type == .BUTTON_PRESS
+            imgui.IO_AddMouseButtonEvent(io, i32(button), is_pressed)
+        }
+        case .MOTION: {
+        
+            io := imgui.GetIO()
+        
+        
+            imgui.IO_AddMousePosEvent(io, cast(f32)event.motion.x, cast(f32)event.motion.y)
+        }
+        case .SCROLL: {}
+        case .CLIENT: {}
+        case .TIMER: {
+        
+            pugl.Update(gui.world, 0.0)
+        }
+        case .LOOP_ENTER: {}
+        case .LOOP_LEAVE: {}
+        case .DATA_OFFER: {}
+        case .DATA: {}
+        case: {}
+    }
+
+    return .SUCCESS
+}
+
+
+// process_event :: proc(plugin: ^PluginData, event: ^clap.Event_Header) {
+
+//     if event.space_id == clap.CORE_EVENT_SPACE_ID && event.event_type == clap.EVENT_PARAM_VALUE {
+//         param_event := transmute(^clap.Event_Param_Value)event
+//         param_index := cast(ParamIDs)param_event.param_id
+
+//         handle_parameter_change(plugin, param_index, f32(param_event.value))
+//     }
+// }
 
 handle_parameter_change :: proc(plugin: ^PluginData, param_index: ParamIDs, value: f32) {
     plugin.audio_param_values[param_index] = value
@@ -1746,270 +1827,6 @@ handle_parameter_change :: proc(plugin: ^PluginData, param_index: ParamIDs, valu
     }
 }
 
-sync_params_main_to_audio :: proc(plugin: ^PluginData, out_events: ^clap.Output_Events) {
-
-    read_index := intrin.atomic_load(&plugin.main_to_audio_fifo.read_index)
-    write_index := intrin.atomic_load(&plugin.main_to_audio_fifo.write_index)
-
-    for read_index != write_index {
-        plugin_event := &plugin.main_to_audio_fifo.events[read_index]
-
-        switch plugin_event.event_type {
-            case .GUI_VALUE_CHANGE: {
-                handle_parameter_change(plugin, plugin_event.param_index, plugin_event.value)
-
-                clap_event := clap.Event_Param_Value {
-                    header = {
-                        size = size_of(clap.Event_Param_Value),
-                        time = 0,
-                        space_id = clap.CORE_EVENT_SPACE_ID,
-                        event_type = clap.EVENT_PARAM_VALUE,
-                        flags = clap.EVENT_IS_LIVE,
-                    },
-                    param_id = u32(plugin_event.param_index),
-                    cookie = nil,
-                    note_id = -1,
-                    port_index = -1,
-                    channel = -1,
-                    key = -1,
-                    value = f64(plugin_event.value)
-                }
-
-                out_events->try_push(&clap_event.header)
-            }
-            case .GUI_GESTURE_BEGIN: {
-
-                clap_event := clap.Event_Param_Gesture {
-                    header = {
-                        size = size_of(clap.Event_Param_Gesture),
-                        time = 0,
-                        space_id = clap.CORE_EVENT_SPACE_ID,
-                        event_type = clap.EVENT_PARAM_GESTURE_BEGIN,
-                        flags = clap.EVENT_IS_LIVE,
-                    },
-                    param_id = u32(plugin_event.param_index),
-                }
-
-                out_events->try_push(&clap_event.header)
-            }
-            case .GUI_GESTURE_END: {
-                clap_event := clap.Event_Param_Gesture {
-                    header = {
-                        size = size_of(clap.Event_Param_Gesture),
-                        time = 0,
-                        space_id = clap.CORE_EVENT_SPACE_ID,
-                        event_type = clap.EVENT_PARAM_GESTURE_END,
-                        flags = clap.EVENT_IS_LIVE,
-                    },
-                    param_id = u32(plugin_event.param_index),
-                }
-
-                out_events->try_push(&clap_event.header)
-            }
-        }
-        read_index += 1
-        read_index &= (FIFO_SIZE-1)
-    }
-    intrin.atomic_store(&plugin.main_to_audio_fifo.read_index, read_index)
-}
-
-plugin_sync_audio_to_main :: proc(plugin: ^PluginData) {
-    for param_id, _ in ParamIDs {
-        plugin.main_param_values[param_id] = plugin.audio_param_values[param_id]
-    }
-}
 
 
-plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> clap.Process_Status {
-    context = runtime.default_context()
-    plugin := transmute(^PluginData)_plugin.plugin_data
 
-    // sync main to audio thread
-    sync_params_main_to_audio(plugin, process.out_events)
-
-    assert(process.audio_outputs_count == 1)
-    assert(process.audio_inputs_count == 1)
-
-    frame_count := process.frames_count
-    input_event_count := process.in_events->size()
-
-    event_index : u32 = 0
-    next_event_frame : u32 = input_event_count != 0 ? 0 : frame_count
-
-    for current_frame_index : u32 = 0; current_frame_index < frame_count ; {
-        for event_index < input_event_count && next_event_frame == current_frame_index {
-            event: ^clap.Event_Header = process.in_events->get(event_index)
-            if event.time != current_frame_index {
-                next_event_frame = event.time
-                break
-            }
-
-            process_event(plugin, event)
-            event_index += 1
-
-            if event_index == input_event_count {
-                next_event_frame = frame_count
-                break
-            }
-        }
-
-
-        {
-            // audio render
-            nsamples : u32 = next_event_frame - current_frame_index
-
-            inputL : []f32 = process.audio_inputs[0].data32[0][current_frame_index:current_frame_index + nsamples]
-            inputR : []f32 = process.audio_inputs[0].data32[1][current_frame_index:current_frame_index + nsamples]
-
-            outputL : []f32 = process.audio_outputs[0].data32[0][current_frame_index:current_frame_index + nsamples]
-            outputR : []f32 = process.audio_outputs[0].data32[1][current_frame_index:current_frame_index + nsamples]
-
-
-            ramped_value_fill_buffer(&plugin.input_gain, nsamples)
-            ramped_value_fill_buffer(&plugin.output_gain, nsamples)
-
-            for &sample, index in inputL { sample *= plugin.input_gain.value_buffer[index] }
-            for &sample, index in inputR { sample *= plugin.input_gain.value_buffer[index] }
-
-
-            echo_process(&plugin.echo, inputL, inputR)
-
-            reverb_process(&plugin.reverb, inputL, inputR)
-
-            for index in 0..<len(inputL) {
-                inputL[index] = clamp(inputL[index], -1.0, 1.0)
-                inputR[index] = clamp(inputR[index], -1.0, 1.0)
-            }
-
-            for &sample, index in inputL { sample *= plugin.output_gain.value_buffer[index] }
-            for &sample, index in inputR { sample *= plugin.output_gain.value_buffer[index] }
-
-            copy(outputL, inputL)
-            copy(outputR, inputR)
-        }
-
-        current_frame_index = next_event_frame
-    }
-
-    free_all(context.temp_allocator)
-    return .CONTINUE
-}
-
-plugin_get_extension :: proc "c" (_plugin: ^clap.Plugin, id: cstring) -> rawptr {
-    switch id {
-        case clap_ext.EXT_AUDIO_PORTS:   { return &audio_port_extension }
-        case clap_ext.EXT_PARAMS:        { return &params_extension }
-        case clap_ext.EXT_STATE:         { return &state_extension }
-        case clap_ext.EXT_TIMER_SUPPORT: { return &timer_extension }
-        case clap_ext.EXT_GUI: { 
-            when ODIN_OS == .Windows { return &gui_extension } 
-            else                     { return nil }
-        }
-    }
-
-    return nil
-}
-
-plugin_on_main_thread :: proc "c" (_plugin: ^clap.Plugin) {}
-
-
-clap_plugin := clap.Plugin {
-    desc             = &plugin_descriptor,
-    plugin_data      = nil,
-    init             = plugin_init,
-    destroy          = plugin_destroy,
-    activate         = plugin_activate,
-    deactivate       = plugin_deactivate,
-    start_processing = plugin_start_processing,
-    stop_processing  = plugin_stop_processing,
-    reset            = plugin_reset,
-    process          = plugin_process,
-    get_extension    = plugin_get_extension,
-    on_main_thread   = plugin_on_main_thread,
-}
-
-plugin_descriptor : clap.Plugin_Descriptor
-
-get_plugin_count :: proc "c" (factory: ^clap_factory.Plugin_Factory) -> u32 { return 1 }
-
-get_plugin_descriptor :: proc "c" (factory: ^clap_factory.Plugin_Factory, index: u32) -> ^clap.Plugin_Descriptor {
-    return index == 0 ? &plugin_descriptor : nil
-}
-
-create_plugin :: proc "c" (factory: ^clap_factory.Plugin_Factory, host: ^clap.Host, plugin_id: cstring) -> ^clap.Plugin {
-
-    if plugin_id != plugin_descriptor.id {
-        return nil
-    }
-
-    context = runtime.default_context()
-    plugin := new(PluginData)
-    plugin.host = host
-    plugin.plugin = clap_plugin
-    plugin.plugin.plugin_data = plugin
-
-    return &plugin.plugin
-}
-
-plugin_factory := clap_factory.Plugin_Factory {
-    get_plugin_count = get_plugin_count,
-    get_plugin_descriptor = get_plugin_descriptor,
-    create_plugin = create_plugin,
-}
-
-plugin_features: []cstring
-
-@(export, rodata)
-clap_entry := clap.Plugin_Entry {
-    clap_version = clap.CLAP_VERSION,
-
-    init = proc "c" (path: cstring) -> bool {
-        context = runtime.default_context()
-
-        plugin_descriptor.clap_version = clap.CLAP_VERSION
-        plugin_descriptor.id           = PLUGIN_DESC_ID
-        plugin_descriptor.name         = PLUGIN_NAME
-        plugin_descriptor.vendor       = "FDN Seeker"
-        plugin_descriptor.url          = ""
-        plugin_descriptor.manual_url   = ""
-        plugin_descriptor.support_url  = ""
-        plugin_descriptor.version      = "0.1"
-        plugin_descriptor.description  = ""
-
-        if slice.is_empty(plugin_features) {
-            plugin_features = make([]cstring, 6)
-        }
-        plugin_features[0] = clap.PLUGIN_FEATURE_AUDIO_EFFECT
-        plugin_features[1] = clap.PLUGIN_FEATURE_STEREO
-        plugin_features[2] = clap.PLUGIN_FEATURE_MULTI_EFFECTS
-        plugin_features[3] = clap.PLUGIN_FEATURE_REVERB
-        plugin_features[4] = clap.PLUGIN_FEATURE_DELAY
-        plugin_features[5] = nil
-
-        plugin_descriptor.features = raw_data(plugin_features)
-
-
-        clap_plugin.desc             = &plugin_descriptor
-        clap_plugin.init             = plugin_init
-        clap_plugin.destroy          = plugin_destroy
-        clap_plugin.activate         = plugin_activate
-        clap_plugin.deactivate       = plugin_deactivate
-        clap_plugin.start_processing = plugin_start_processing
-        clap_plugin.stop_processing  = plugin_stop_processing
-        clap_plugin.reset            = plugin_reset
-        clap_plugin.process          = plugin_process
-        clap_plugin.get_extension    = plugin_get_extension
-        clap_plugin.on_main_thread   = plugin_on_main_thread
-
-        return true
-    },
-
-    deinit = proc "c" () {
-        context = runtime.default_context()
-        delete(plugin_features)
-    },
-
-    get_factory = proc "c" (id: cstring) -> rawptr {
-        return id == clap_factory.PLUGIN_FACTORY_ID ? &plugin_factory : nil
-    },
-}

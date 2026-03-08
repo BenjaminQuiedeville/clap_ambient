@@ -9,18 +9,18 @@
             "modernui": 1
         },
         "classnamespace": "box",
-        "rect": [ 34.0, 77.0, 1454.0, 939.0 ],
+        "rect": [ 134.0, 134.0, 1454.0, 939.0 ],
         "subpatcher_template": "empty_mixer",
         "boxes": [
             {
                 "box": {
-                    "id": "obj-12",
+                    "id": "obj-8",
                     "maxclass": "message",
                     "numinlets": 2,
                     "numoutlets": 1,
                     "outlettype": [ "" ],
-                    "patching_rect": [ 728.0, 463.0, 271.0, 22.0 ],
-                    "text": "plug D:/Dev/clap/clap_ambient/build/ambient.vst3"
+                    "patching_rect": [ 204.0, 284.0, 377.0, 22.0 ],
+                    "text": "plug D:/Dev/clap/clap_ambient/build/debug/clap_ambient_debug.vst3"
                 }
             },
             {
@@ -29,20 +29,20 @@
                     "bgmode": 0,
                     "border": 0,
                     "clickthrough": 0,
-                    "id": "obj-8",
+                    "id": "obj-1",
                     "maxclass": "newobj",
                     "numinlets": 2,
                     "numoutlets": 8,
                     "offset": [ 0.0, 0.0 ],
                     "outlettype": [ "signal", "signal", "", "list", "int", "", "", "" ],
-                    "patching_rect": [ 747.0, 498.0, 92.5, 22.0 ],
-                    "save": [ "#N", "vst~", "loaduniqueid", 0, ";" ],
+                    "patching_rect": [ 204.0, 317.0, 511.0, 210.0 ],
+                    "save": [ "#N", "vst~", "loaduniqueid", 0, "D:/Dev/clap/clap_ambient/build/debug/clap_ambient_debug.vst3", ";" ],
                     "saved_attribute_attributes": {
                         "valueof": {
                             "parameter_invisible": 1,
-                            "parameter_longname": "vst~[1]",
+                            "parameter_longname": "vst~",
                             "parameter_modmode": 0,
-                            "parameter_shortname": "vst~[1]",
+                            "parameter_shortname": "vst~",
                             "parameter_type": 3
                         }
                     },
@@ -59,7 +59,18 @@
                         "type": "list",
                         "subtype": "Undefined",
                         "embed": 1,
-                        "snapshot": {                        },
+                        "snapshot": {
+                            "pluginname": "clap_ambient_debug.vst3",
+                            "plugindisplayname": "Ambient",
+                            "pluginsavedname": "",
+                            "pluginsaveduniqueid": 0,
+                            "version": 1,
+                            "isbank": 0,
+                            "isbase64": 1,
+                            "sliderorder": [],
+                            "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ],
+                            "blob": "110.VMjLgTF....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9.iK77RRC8Vav8lak4Fc9vyKVMEUy.Ea0cVZtMEcgQWY9.."
+                        },
                         "snapshotlist": {
                             "current_snapshot": 0,
                             "entries": [
@@ -67,26 +78,37 @@
                                     "filetype": "C74Snapshot",
                                     "version": 2,
                                     "minorversion": 0,
-                                    "name": "",
-                                    "origin": "",
+                                    "name": "Ambient",
+                                    "origin": "clap_ambient_debug.vst3",
                                     "type": "VST3",
                                     "subtype": "AudioEffect",
-                                    "embed": 0,
-                                    "snapshot": {                                    },
+                                    "embed": 1,
+                                    "snapshot": {
+                                        "pluginname": "clap_ambient_debug.vst3",
+                                        "plugindisplayname": "Ambient",
+                                        "pluginsavedname": "",
+                                        "pluginsaveduniqueid": 0,
+                                        "version": 1,
+                                        "isbank": 0,
+                                        "isbase64": 1,
+                                        "sliderorder": [],
+                                        "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ],
+                                        "blob": "110.VMjLgTF....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9.iK77RRC8Vav8lak4Fc9vyKVMEUy.Ea0cVZtMEcgQWY9.."
+                                    },
                                     "fileref": {
-                                        "name": "",
-                                        "filename": ".maxsnap",
+                                        "name": "Ambient",
+                                        "filename": "Ambient_20260308.maxsnap",
                                         "filepath": "D:/Documents/Max 9/Snapshots",
                                         "filepos": -1,
-                                        "snapshotfileid": "6acf0cec95540405a26e10018dc1b68d"
+                                        "snapshotfileid": "510a276c6ca4007f35eaab39ff4fcc70"
                                     }
                                 }
                             ]
                         }
                     },
-                    "text": "vst~",
-                    "varname": "vst~[1]",
-                    "viewvisibility": 0
+                    "text": "vst~ D:/Dev/clap/clap_ambient/build/debug/clap_ambient_debug.vst3",
+                    "varname": "vst~",
+                    "viewvisibility": 1
                 }
             },
             {
@@ -112,94 +134,6 @@
                     "patching_rect": [ 315.0, 611.0, 235.0, 403.0 ],
                     "scroll": 3,
                     "sono": 1
-                }
-            },
-            {
-                "box": {
-                    "autosave": 1,
-                    "bgmode": 0,
-                    "border": 0,
-                    "clickthrough": 0,
-                    "id": "obj-1",
-                    "maxclass": "newobj",
-                    "numinlets": 2,
-                    "numoutlets": 8,
-                    "offset": [ 0.0, 0.0 ],
-                    "outlettype": [ "signal", "signal", "", "list", "int", "", "", "" ],
-                    "patching_rect": [ 164.0, 372.0, 471.0, 204.0 ],
-                    "save": [ "#N", "vst~", "loaduniqueid", 0, "D:/Dev/clap/clap_ambient/build/clap_ambient.vst3", ";" ],
-                    "saved_attribute_attributes": {
-                        "valueof": {
-                            "parameter_invisible": 1,
-                            "parameter_longname": "vst~",
-                            "parameter_modmode": 0,
-                            "parameter_shortname": "vst~",
-                            "parameter_type": 3
-                        }
-                    },
-                    "saved_object_attributes": {
-                        "parameter_enable": 1,
-                        "parameter_mappable": 0
-                    },
-                    "snapshot": {
-                        "filetype": "C74Snapshot",
-                        "version": 2,
-                        "minorversion": 0,
-                        "name": "snapshotlist",
-                        "origin": "vst~",
-                        "type": "list",
-                        "subtype": "Undefined",
-                        "embed": 1,
-                        "snapshot": {
-                            "pluginname": "clap_ambient_debug.vst3",
-                            "plugindisplayname": "Clap Ambient debug (CLAP->VST3)",
-                            "pluginsavedname": "",
-                            "pluginsaveduniqueid": 0,
-                            "version": 1,
-                            "isbank": 0,
-                            "isbase64": 1,
-                            "sliderorder": [],
-                            "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ],
-                            "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hRP4hKtX1Jt3hKtbyPt3hK18jKtvlVFEjKt3xMCwyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
-                        },
-                        "snapshotlist": {
-                            "current_snapshot": 0,
-                            "entries": [
-                                {
-                                    "filetype": "C74Snapshot",
-                                    "version": 2,
-                                    "minorversion": 0,
-                                    "name": "Clap Ambient (CLAP->VST3)",
-                                    "origin": "clap_ambient_debug.vst3",
-                                    "type": "VST3",
-                                    "subtype": "AudioEffect",
-                                    "embed": 1,
-                                    "snapshot": {
-                                        "pluginname": "clap_ambient_debug.vst3",
-                                        "plugindisplayname": "Clap Ambient debug (CLAP->VST3)",
-                                        "pluginsavedname": "",
-                                        "pluginsaveduniqueid": 0,
-                                        "version": 1,
-                                        "isbank": 0,
-                                        "isbase64": 1,
-                                        "sliderorder": [],
-                                        "slidervisibility": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ],
-                                        "blob": "186.VMjLgDK....O+fWarAhckI2bo8la8HRLt.iHfTlai8FYo41Y8HRUTYTK3HxO9.BOVMEUy.Ea0cVZtMEcgQWY9vSRC8Vav8lak4Fc9TiMt3hKt3hKt3hKt3hKt3BVz.kKt3hKq3hKPIlVD4hKtLySt3hKt3hKt3hKt3hKt3hRP4hKtX1Jt3hKtbyPt3hK18jKtvlVFEjKt3xMCwyKIMzasA2atUlaz4COuX0TTMCTrU2Yo41TzEFck4C."
-                                    },
-                                    "fileref": {
-                                        "name": "Clap Ambient (CLAP->VST3)",
-                                        "filename": "Clap Ambient (CLAP->VST3).maxsnap",
-                                        "filepath": "D:/Documents/Max 9/Snapshots",
-                                        "filepos": -1,
-                                        "snapshotfileid": "56b535adea36a41a4157dd9e3392699b"
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "text": "vst~ D:/Dev/clap/clap_ambient/build/clap_ambient.vst3",
-                    "varname": "vst~",
-                    "viewvisibility": 1
                 }
             },
             {
@@ -366,17 +300,6 @@
             },
             {
                 "box": {
-                    "id": "obj-5",
-                    "maxclass": "newobj",
-                    "numinlets": 1,
-                    "numoutlets": 1,
-                    "outlettype": [ "bang" ],
-                    "patching_rect": [ 138.0, 294.0, 58.0, 22.0 ],
-                    "text": "loadbang"
-                }
-            },
-            {
-                "box": {
                     "id": "obj-2",
                     "maxclass": "newobj",
                     "numinlets": 1,
@@ -500,7 +423,7 @@
                                     "maxclass": "inlet",
                                     "numinlets": 0,
                                     "numoutlets": 1,
-                                    "outlettype": [ "signal" ],
+                                    "outlettype": [ "" ],
                                     "patching_rect": [ 50.0, 40.0, 30.0, 30.0 ]
                                 }
                             },
@@ -512,7 +435,7 @@
                                     "maxclass": "inlet",
                                     "numinlets": 0,
                                     "numoutlets": 1,
-                                    "outlettype": [ "signal" ],
+                                    "outlettype": [ "" ],
                                     "patching_rect": [ 177.0, 40.0, 30.0, 30.0 ]
                                 }
                             },
@@ -673,58 +596,12 @@
                     "numoutlets": 0,
                     "patching_rect": [ 178.0, 861.0, 60.0, 60.0 ]
                 }
-            },
-            {
-                "box": {
-                    "id": "obj-4",
-                    "maxclass": "message",
-                    "numinlets": 2,
-                    "numoutlets": 1,
-                    "outlettype": [ "" ],
-                    "patching_rect": [ 138.0, 325.0, 377.0, 22.0 ],
-                    "text": "plug D:/Dev/clap/clap_ambient/build/debug/clap_ambient_debug.vst3"
-                }
             }
         ],
         "lines": [
             {
                 "patchline": {
-                    "destination": [ "obj-15", 1 ],
-                    "source": [ "obj-1", 1 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-15", 0 ],
-                    "order": 2,
-                    "source": [ "obj-1", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-25", 0 ],
-                    "order": 0,
-                    "source": [ "obj-1", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-7", 0 ],
-                    "order": 1,
-                    "source": [ "obj-1", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-1", 1 ],
-                    "order": 0,
-                    "source": [ "obj-10", 0 ]
-                }
-            },
-            {
-                "patchline": {
                     "destination": [ "obj-1", 0 ],
-                    "order": 1,
                     "source": [ "obj-10", 0 ]
                 }
             },
@@ -732,26 +609,6 @@
                 "patchline": {
                     "destination": [ "obj-35", 0 ],
                     "source": [ "obj-11", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-8", 0 ],
-                    "source": [ "obj-12", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-1", 1 ],
-                    "order": 0,
-                    "source": [ "obj-13", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-1", 0 ],
-                    "order": 1,
-                    "source": [ "obj-13", 0 ]
                 }
             },
             {
@@ -849,20 +706,6 @@
             },
             {
                 "patchline": {
-                    "destination": [ "obj-1", 1 ],
-                    "order": 0,
-                    "source": [ "obj-2", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-1", 0 ],
-                    "order": 1,
-                    "source": [ "obj-2", 0 ]
-                }
-            },
-            {
-                "patchline": {
                     "destination": [ "obj-13", 1 ],
                     "source": [ "obj-20", 0 ]
                 }
@@ -893,20 +736,14 @@
             },
             {
                 "patchline": {
-                    "destination": [ "obj-1", 0 ],
-                    "source": [ "obj-4", 0 ]
-                }
-            },
-            {
-                "patchline": {
-                    "destination": [ "obj-4", 0 ],
-                    "source": [ "obj-5", 0 ]
-                }
-            },
-            {
-                "patchline": {
                     "destination": [ "obj-2", 0 ],
                     "source": [ "obj-6", 0 ]
+                }
+            },
+            {
+                "patchline": {
+                    "destination": [ "obj-1", 0 ],
+                    "source": [ "obj-8", 0 ]
                 }
             },
             {
@@ -919,7 +756,6 @@
         "parameters": {
             "obj-1": [ "vst~", "vst~", 0 ],
             "obj-17": [ "live.gain~[1]", "OutLevel", 0 ],
-            "obj-8": [ "vst~[1]", "vst~[1]", 0 ],
             "inherited_shortname": 1
         },
         "autosave": 0,
