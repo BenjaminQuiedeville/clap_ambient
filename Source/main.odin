@@ -14,7 +14,8 @@ import "core:c"
 import opengl "vendor:OpenGL"
 
 import imgui "../libs//odin-imgui"
-// import imgui_win32 "../odin-imgui/imgui_impl_win32"
+import glfw "vendor:glfw"
+
 import imgui_opengl "../libs/odin-imgui/imgui_impl_opengl3"
 import clap  "../libs/clap-odin"
 import clap_ext "../libs/clap-odin/ext"
@@ -399,7 +400,7 @@ notes :
     extraire les signaux de sorties aux sorties des DL et les répartir gaiche/droite
     complexifier le signal d'entrée par qq AP en séries, ou un FIR avec des AP sur chaque tap (simule les réflexions d'une grande piece)
     une boucle comme ca est équivalente à un FDN avec une matrice de mix creuse, mais est moins couteuse (ne demande pas de multiplication matricielle O(N^2))
-    
+
 */
 Reverb :: struct {
 
@@ -1097,14 +1098,14 @@ state_extension := clap_ext.Plugin_State {
 }
 
 gui_timer_callback :: proc "c" (_plugin: ^clap.Plugin, timer_id: clap.Clap_Id) {
-    // reprendre les fonctions dans les exemples 
+    // reprendre les fonctions dans les exemples
     // appeler pugl.UpdateView
     context = runtime.default_context()
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
-    
+
     pugl.Update(gui.world, 0.0)
-    
+
 }
 
 @(rodata)
@@ -1170,7 +1171,7 @@ handle_widget_update :: proc(plugin: ^PluginData, param_index: ParamIDs, widget_
 
 gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status {
     context = runtime.default_context()
-    
+
     plugin := transmute(^PluginData)pugl.GetHandle(view)
     gui := &plugin.gui
 
@@ -1178,29 +1179,33 @@ gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status 
 
     #partial switch event.type {
         case .CONFIGURE: {
-            
+
             pugl.EnterContext(gui.view)
             opengl.Viewport(0, 0, cast(i32)event.configure.width, cast(i32)event.configure.height)
             pugl.LeaveContext(gui.view)
             pugl.ObscureView(gui.view)
-        
+
         }
         case .REALIZE: {
             imgui.CHECKVERSION()
             imgui.SetCurrentContext(nil)
             gui.imgui_context = imgui.CreateContext()
             imgui.SetCurrentContext(gui.imgui_context)
-            
+
             imgui_io := imgui.GetIO()
             imgui_io.ConfigFlags = { .NoKeyboard }
             imgui_io.DisplaySize.x = f32(gui.width)
             imgui_io.DisplaySize.y = f32(gui.height)
             imgui_io.IniFilename = nil
             imgui_io.LogFilename = nil
-            
+
             imgui.StyleColorsDark()
-            
-            opengl.load_up_to(3, 2, win32.gl_set_proc_address)
+
+            when ODIN_OS == .Windows {
+                opengl.load_up_to(3, 2, win32.gl_set_proc_address)
+            } else {
+                opengl.load_up_to(3, 2, glfw.gl_set_proc_address)
+            }
             imgui_opengl.Init()
         }
         case .UNREALIZE: {
@@ -1289,7 +1294,7 @@ gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status 
 
             clear_color := imgui.Vec4 {0.45, 0.55, 0.6, 1.0}
             imgui.Render()
-            
+
             expose_event := &event.expose
 
             opengl.Viewport(cast(i32)expose_event.x, cast(i32)expose_event.y, cast(i32)expose_event.width, cast(i32)expose_event.height)
@@ -1311,24 +1316,24 @@ gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status 
         }
         case .POINTER_IN: {}
         case .POINTER_OUT: {}
-        
+
         // mouse click
         case .BUTTON_PRESS: {} fallthrough
         case .BUTTON_RELEASE: {
-            
+
             io := imgui.GetIO()
-            
+
             button: imgui.MouseButton
             button = imgui.MouseButton(event.button.button)
-            
+
             is_pressed := event.type == .BUTTON_PRESS
             imgui.IO_AddMouseButtonEvent(io, i32(button), is_pressed)
         }
         case .MOTION: {
-        
+
             io := imgui.GetIO()
-        
-        
+
+
             imgui.IO_AddMousePosEvent(io, cast(f32)event.motion.x, cast(f32)event.motion.y)
         }
         case .SCROLL: {}
@@ -1351,14 +1356,14 @@ create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) 
 
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
-    
+
     gui.width = 1200
     gui.height = 600
-    
+
     gui.world = pugl.NewWorld(.MODULE, 0)
     pugl.SetWorldString(gui.world, .CLASS_NAME, PLUGIN_NAME)
-    
-    
+
+
     // create timer
     return true
 }
@@ -1366,7 +1371,7 @@ create_gui :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) 
 destroy_gui :: proc "c" (_plugin: ^clap.Plugin) {
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
-    
+
     plugin_hidden := hide_gui(_plugin)
 
     // kill timer
@@ -1415,14 +1420,14 @@ gui_set_parent :: proc "c" (_plugin: ^clap.Plugin, parent_window: ^clap_ext.Wind
     context = runtime.default_context()
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
-    
+
     result := pugl.Status.SUCCESS
 
     gui.view = pugl.NewView(gui.world)
 
     result = pugl.SetParent(plugin.gui.view, cast(pugl.Native_View)parent_window.handle.win32)
     assert(result == .SUCCESS)
-    
+
     return true
 }
 
@@ -1430,7 +1435,7 @@ show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     context = runtime.default_context()
     plugin := transmute(^PluginData)_plugin.plugin_data
     gui := &plugin.gui
-    
+
     pugl.SetPositionHint(gui.view, .DEFAULT_POSITION, 0, 0)
     pugl.SetSizeHint(gui.view, .DEFAULT_SIZE, u32(gui.width), u32(gui.height))
     // pugl.SetViewHint(gui.view, .DOUBLE_BUFFER, 1)
@@ -1441,17 +1446,17 @@ show_gui :: proc "c" (_plugin: ^clap.Plugin) -> bool {
     pugl.SetViewHint(gui.view, .CONTEXT_VERSION_MINOR, 2)
     pugl.SetViewHint(gui.view, .CONTEXT_PROFILE, cast(i32)pugl.View_Hint_Value.OPENGL_COMPATIBILITY_PROFILE)
     pugl.SetHandle(gui.view, plugin)
-    
+
     pugl.SetViewHint(gui.view, .RESIZABLE, 1)
-    
+
     pugl.SetEventFunc(gui.view, gui_procedure)
-    
+
     result := pugl.Realize(gui.view)
     assert(result == nil)
-    
-    result = pugl.Show(gui.view, .RAISE) 
+
+    result = pugl.Show(gui.view, .RAISE)
     assert(result == .SUCCESS)
-    
+
     host_timer_ext := transmute(^clap_ext.Host_Timer_Support)plugin.host->get_extension(clap_ext.EXT_TIMER_SUPPORT)
     host_timer_ext.register_timer(plugin.host, 16, &gui.timer_id)
 
@@ -1897,14 +1902,11 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
 
 plugin_get_extension :: proc "c" (_plugin: ^clap.Plugin, id: cstring) -> rawptr {
     switch id {
-        case clap_ext.EXT_AUDIO_PORTS:   { return &audio_port_extension }
-        case clap_ext.EXT_PARAMS:        { return &params_extension }
-        case clap_ext.EXT_STATE:         { return &state_extension }
-        case clap_ext.EXT_TIMER_SUPPORT: { return &timer_extension }
-        case clap_ext.EXT_GUI: { 
-            when ODIN_OS == .Windows { return &gui_extension } 
-            else                     { return nil }
-        }
+        case clap_ext.EXT_AUDIO_PORTS:      { return &audio_port_extension }
+        case clap_ext.EXT_PARAMS:           { return &params_extension }
+        case clap_ext.EXT_STATE:            { return &state_extension }
+        case clap_ext.EXT_TIMER_SUPPORT:    { return &timer_extension }
+        case clap_ext.EXT_GUI:              { return &gui_extension }
     }
 
     return nil

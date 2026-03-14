@@ -13,21 +13,24 @@ set(CLAP_VST3_TUID_STRING "camb")
 FILE(GLOB odin_object_files ${ODIN_OBJ_DIR}/*.obj)
 
 add_library(plugin_entry STATIC Source/plugin_entry.cpp ${odin_object_files})
-target_link_libraries(plugin_entry PRIVATE 
+target_link_libraries(plugin_entry PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/build/${PUGL_LIBNAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/build/${IMGUI_LIBNAME}
 )
 
 if(WIN32)
-    target_link_libraries(plugin_entry PRIVATE 
+    target_link_libraries(plugin_entry PRIVATE
         Dwmapi.lib
         user32.lib
         opengl32.lib
     )
-    
-else() 
+
+else(LINUX)
     # tester sur linux
-    target_link_libraries(plugin_entry PRIVATE Gl) 
+    target_link_libraries(plugin_entry PRIVATE
+        X11 Xrandr Xext Xcursor
+        GL glfw
+    )
 endif()
 
 
