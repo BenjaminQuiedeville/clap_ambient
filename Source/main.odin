@@ -1960,7 +1960,7 @@ plugin_factory := clap_factory.Plugin_Factory {
 plugin_features: []cstring
 
 @(export, rodata)
-clap_entry := clap.Plugin_Entry {
+odin_entry := clap.Plugin_Entry {
     clap_version = clap.CLAP_VERSION,
 
     init = proc "c" (path: cstring) -> bool {

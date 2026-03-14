@@ -1,4 +1,9 @@
 build
 *.lib
-!imgui.lib
+*.exp
+*.pdb
+*.ilk
+libs/odin-imgui/temp
+libs/odin-imgui/dear_bindings
+libs/odin-imgui/imgui
 snapshots

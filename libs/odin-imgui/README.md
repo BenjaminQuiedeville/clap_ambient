@@ -1,5 +1,7 @@
 # Odin ImGui
 
+This a fork of [odin-imgui by L4](https://gitlab.com/L-4/odin-imgui)
+
 ## Generated Dear ImGui bindings using dear_bindings
 
  - Generates bindings for the and `docking` ImGui branche, using [`dear_bindings`](https://github.com/dearimgui/dear_bindings)

@@ -164,16 +164,19 @@ def get_platform_imgui_lib_name() -> str:
 
 	system = platform.system()
 
-	processor = None
-	if platform.machine() in ["AMD64", "x86_64"]: processor = "x64"
-	if platform.machine() in ["arm64"]:           processor = "arm64"
+	# processor = None
+	# if platform.machine() in ["AMD64", "x86_64"]: processor = "x64"
+	# if platform.machine() in ["arm64"]:           processor = "arm64"
 
-	binary_ext = "lib" if system == "Windows" else "a"
+	# binary_ext = "lib" if system == "Windows" else "a"
 
-	assertx(system != "", "System could not be determined")
-	assertx(processor != None, f"Unexpected processor: {platform.machine()}")
+	# assertx(system != "", "System could not be determined")
+	# assertx(processor != None, f"Unexpected processor: {platform.machine()}")
 
-	return f'imgui_{system.lower()}_{processor}.{binary_ext}'
+	# return f'imgui_{system.lower()}_{processor}.{binary_ext}'
+
+	if system == "Windows": return "imgui.lib"
+	else: 					return "libimgui.a"
 
 # TODO[TS]: This works, but there's a bug in Python, which makes cl.exe return with
 # exit code 2 for no god damn reason at all, if not run with run_vcvars.
