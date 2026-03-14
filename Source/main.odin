@@ -13,6 +13,8 @@ import "core:strconv"
 import "core:c"
 import opengl "vendor:OpenGL"
 
+import simd_x86 "core:simd/x86"
+
 import imgui "../libs//odin-imgui"
 import glfw "vendor:glfw"
 
@@ -1824,10 +1826,16 @@ plugin_sync_audio_to_main :: proc(plugin: ^PluginData) {
     }
 }
 
-
+@(enable_target_feature = "sse,avx")
 plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> clap.Process_Status {
     context = runtime.default_context()
     plugin := transmute(^PluginData)_plugin.plugin_data
+
+    // turn off denormals 
+    when ODIN_ARCH == .amd64 {
+        old_csr_register_value := simd_x86._mm_getcsr()
+        simd_x86._mm_setcsr(old_csr_register_value | 0x8040)
+    }
 
     // sync main to audio thread
     sync_params_main_to_audio(plugin, process.out_events)
@@ -1868,8 +1876,8 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
 
             outputL : []f32 = process.audio_outputs[0].data32[0][current_frame_index:current_frame_index + nsamples]
             outputR : []f32 = process.audio_outputs[0].data32[1][current_frame_index:current_frame_index + nsamples]
-
-
+            
+            
             ramped_value_fill_buffer(&plugin.input_gain, nsamples)
             ramped_value_fill_buffer(&plugin.output_gain, nsamples)
 
@@ -1891,9 +1899,15 @@ plugin_process :: proc "c" (_plugin: ^clap.Plugin, process: ^clap.Process) -> cl
 
             copy(outputL, inputL)
             copy(outputR, inputR)
+            
         }
 
         current_frame_index = next_event_frame
+    }
+
+    // sets back denormals handling state
+    when ODIN_ARCH == .amd64 {
+        simd_x86._mm_setcsr(old_csr_register_value)
     }
 
     free_all(context.temp_allocator)
