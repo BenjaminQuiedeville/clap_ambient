@@ -97,8 +97,14 @@ def final_build(debug: bool, optim: bool, config: str):
         exit(-1)
 
     odin_obj_dir = f"build/odin_code/{config}"
+    
+    defines = " ".join([
+        f"-DIMGUI_LIBNAME={imgui_libname}",
+        f"-DPUGL_LIBNAME={pugl_libname}",
+        f"-DODIN_OBJ_DIR={odin_obj_dir}"
+    ])
 
-    run(f"cmake -S . -B build/cmake -G\"Ninja Multi-Config\" -DIMGUI_LIBNAME={imgui_libname} -DPUGL_LIBNAME={pugl_libname} -DODIN_OBJ_DIR={odin_obj_dir}")
+    run(f"cmake -S . -B build/cmake -G\"Ninja Multi-Config\" {defines}")
     run(f"cmake --build build/cmake --config {cmake_config}")
 
     return
