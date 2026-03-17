@@ -1115,12 +1115,21 @@ timer_extension := clap_ext.Plugin_Timer_Support {
     on_timer = gui_timer_callback
 }
 
+when ODIN_OS == .Linux {
+    preferred_gui_api :: "" // temporary, needs fixing
+} else when ODIN_OS == .Darwin {
+    preferred_gui_api :: clap_ext.WINDOW_API_COCOA
+} else when ODIN_OS == .Windows {
+    preferred_gui_api :: clap_ext.WINDOW_API_WIN32
+}
+
+
 is_gui_api_supported :: proc "c" (_plugin: ^clap.Plugin, api: cstring, is_floating: bool) -> bool {
-    return string(api) == clap_ext.WINDOW_API_WIN32 && !is_floating
+    return string(api) == preferred_gui_api && !is_floating
 }
 
 gui_get_preferred_api :: proc "c" (_plugin: ^clap.Plugin, api: ^cstring, is_floating: ^bool) -> bool {
-    api^ = clap_ext.WINDOW_API_WIN32
+    api^ = preferred_gui_api
     // is_floating^ = false
     return true
 }
@@ -1920,7 +1929,9 @@ plugin_get_extension :: proc "c" (_plugin: ^clap.Plugin, id: cstring) -> rawptr 
         case clap_ext.EXT_PARAMS:           { return &params_extension }
         case clap_ext.EXT_STATE:            { return &state_extension }
         case clap_ext.EXT_TIMER_SUPPORT:    { return &timer_extension }
-        case clap_ext.EXT_GUI:              { return &gui_extension }
+        case clap_ext.EXT_GUI:              {
+            return &gui_extension
+        }
     }
 
     return nil
