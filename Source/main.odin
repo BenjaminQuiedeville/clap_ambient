@@ -82,7 +82,7 @@ parameter_infos := [ParamIDs]ParamInfo {
     },
 
     .EchoTime = {
-        name = "Delay Time", format_string = "%.2f ms", min = 1.0, max = 2000.0, default_value = 300.0,
+        name = "Delay Time", format_string = "%.2f ms", min = 1.0, max = 10000.0, default_value = 300.0,
         imgui_flags = {.ClampOnInput, .ClampZeroRange},
         clap_param_flags = clap_ext.PARAM_IS_AUTOMATABLE
     },
@@ -560,13 +560,13 @@ reverb_process :: proc(reverb: ^Reverb, bufferL: []f32, bufferR: []f32) {
         }
     }
 
+    apply_gain_linear(output_bufferL, 0.5)
+    apply_gain_linear(output_bufferR, 0.5)
+
     for index in 0..<nsamples {
         bufferL[index] = math.lerp(bufferL[index], output_bufferL[index], reverb.mix)
         bufferR[index] = math.lerp(bufferR[index], output_bufferR[index], reverb.mix)
     }
-
-    apply_gain_linear(bufferL, 0.5)
-    apply_gain_linear(bufferR, 0.5)
 }
 
 
