@@ -13,7 +13,8 @@ set(CLAP_VST3_TUID_STRING "camb")
 FILE(GLOB odin_object_files ${ODIN_OBJ_DIR}/*.obj)
 
 add_library(plugin_entry STATIC Source/plugin_entry.cpp ${odin_object_files})
-target_link_libraries(plugin_entry PRIVATE
+
+target_link_libraries(plugin_entry PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/build/${PUGL_LIBNAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/build/${IMGUI_LIBNAME}
 )
@@ -23,6 +24,7 @@ if(WIN32)
         Dwmapi.lib
         user32.lib
         opengl32.lib
+        Bcrypt.lib
     )
 
 else(LINUX)
@@ -32,7 +34,6 @@ else(LINUX)
         GL glfw
     )
 endif()
-
 
 add_compile_options(-D_DLL -mavx -fno-math-errno -Wall -Wextra
                     -Wno-pragma-pack
@@ -46,7 +47,6 @@ add_compile_options(-D_DLL -mavx -fno-math-errno -Wall -Wextra
                     -Wno-microsoft-enum-value)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/libs/clap-wrapper)
-set(VST3_TARGET ${PROJECT_NAME}_vst3)
 
 make_clapfirst_plugins(
     TARGET_NAME             ${PROJECT_NAME}
