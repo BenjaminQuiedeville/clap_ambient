@@ -11,19 +11,21 @@ import "core:fmt"
 import "core:strings"
 import "core:strconv"
 import "core:c"
-import opengl "vendor:OpenGL"
-
 import simd_x86 "core:simd/x86"
 
-import imgui "../libs//odin-imgui"
+import opengl "vendor:OpenGL"
 import glfw "vendor:glfw"
 
+import imgui "../libs/odin-imgui"
 import imgui_opengl "../libs/odin-imgui/imgui_impl_opengl3"
+
 import clap  "../libs/clap-odin"
 import clap_ext "../libs/clap-odin/ext"
 import clap_factory "../libs/clap-odin/factory"
 
 import pugl "../libs/pugl-odin"
+
+// import "vstentry"
 
 BUILD_CONFIG :: #config(BUILD_CONFIG, "debug")
 
@@ -1239,24 +1241,33 @@ gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status 
 
             viewport := imgui.GetMainViewport()
             // position := viewport.WorkPos
-            size := viewport.WorkSize
+            view_size := viewport.WorkSize
 
-            // imgui.PushItemWidth(int), imgui.PopItemWidth()
+
+            imgui.SetNextWindowPos({0, 0})
+            imgui.SetNextWindowSize(view_size)
+            
+            open: bool = true
+            imgui.Begin("Mainwindow", &open, {.NoCollapse, .NoResize})
+
             {
-                imgui.SetNextWindowPos({0, 0})
-                imgui.SetNextWindowSize({size.x, size.y})
+                cursor_pos := imgui.GetCursorScreenPos()
+                avail_space := imgui.GetContentRegionAvail()
 
-                open: bool = true
-                imgui.Begin("Mainwindow", &open, {.NoCollapse, .NoResize})
-
-                gain_window_size : f32 = 60.0
-                imgui.BeginChild("Volumes", {500, gain_window_size})
+                imgui.BeginChild("Volumes", {avail_space.x, 60})
+                imgui.PushItemWidth((avail_space.x-40)/2)
                 make_hslider(plugin, .InGain)
-                // imgui.SameLine()
+                imgui.SameLine()
                 make_hslider(plugin, .OutGain)
+                imgui.PopItemWidth()
                 imgui.EndChild()
+            }
 
-                imgui.BeginChild("Echo", {size.x/2, size.y-gain_window_size})
+            cursor_pos := imgui.GetCursorScreenPos()
+            avail_space := imgui.GetContentRegionAvail()
+            child_size := [2]f32 {(avail_space.x - 10)/2, avail_space.y}
+            {
+                imgui.BeginChild("Echo", child_size)
 
                 imgui.SeparatorText("Echo")
                 make_hslider(plugin, .EchoTime)
@@ -1266,11 +1277,19 @@ gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status 
                 make_hslider(plugin, .EchoModAmount)
                 make_hslider(plugin, .EchoMix)
 
+                imgui.PlotLines("Echo buffer content", raw_data(plugin.echo.delay_lineL.buffer), cast(i32)len(plugin.echo.delay_lineL.buffer), 0, 
+                                scale_min = -1.0, scale_max = 1.0, graph_size = {child_size.x, 80})
+
                 imgui.EndChild()
+            }
+            
+            imgui.SameLine()
+            {
+            
+                cursor_pos := imgui.GetCursorScreenPos()
+                avail_space := imgui.GetContentRegionAvail()
 
-                imgui.SameLine()
-
-                imgui.BeginChild("Reverb", {size.x/2, size.y-gain_window_size})
+                imgui.BeginChild("Reverb", child_size)
 
                 imgui.SeparatorText("Reverb")
                 make_hslider(plugin, .ReverbDecay)
@@ -1296,7 +1315,6 @@ gui_procedure :: proc "c" (view: ^pugl.View, event: ^pugl.Event) -> pugl.Status 
                     for &ap in plugin.reverb.diffusors[0].allpasses {
                         slice.zero(ap.delay_line.buffer)
                     }
-
                 }
 
                 imgui.EndChild()
